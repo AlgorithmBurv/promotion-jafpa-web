@@ -6,7 +6,6 @@ import { Toaster } from "react-hot-toast";
 import Login from "./components/Login";
 import Sidebar from "./components/Sidebar";
 import Header from "./components/Header";
-import Dashboard from "./components/Dashboard";
 import FormPengajuan from "./components/FormPengajuan";
 import StatusPengajuan from "./components/StatusPengajuan";
 import ManajemenUser from "./components/ManajemenUser";
@@ -38,7 +37,8 @@ function App() {
     } else if (user.role === "BusDev") {
       setActiveMenu("review_pengajuan");
     } else {
-      setActiveMenu("dashboard");
+      // Default menu untuk Sales diubah menjadi form pengajuan karena dashboard dihapus
+      setActiveMenu("form_pengajuan");
     }
   };
 
@@ -128,13 +128,6 @@ function App() {
             )}
 
             {/* Menu Khusus Sales */}
-            {activeMenu === "dashboard" && currentUser.role === "Sales" && (
-              <Dashboard
-                currentUser={currentUser}
-                daftarPengajuan={daftarPengajuan}
-              />
-            )}
-
             {activeMenu === "form_pengajuan" &&
               currentUser.role === "Sales" && (
                 <FormPengajuan
@@ -173,15 +166,18 @@ function App() {
 
             {activeMenu === "manajemen_customer" &&
               currentUser.role === "Admin" && <ManajemenCustomer />}
+
             {activeMenu === "manajemen_produk" &&
               currentUser.role === "Admin" && <ManajemenProduk />}
-            {/* TAMBAHKAN KONDISI INI UNTUK LOG AKTIVITAS */}
+
             {activeMenu === "log_aktivitas" && currentUser.role === "Admin" && (
               <ManajemenLog />
             )}
-            {activeMenu === "reporting" && currentUser.role === "Admin" && (
-              <Reporting />
-            )}
+
+            {/* Izinkan Admin ATAU BusDev untuk melihat Reporting */}
+            {activeMenu === "reporting" &&
+              (currentUser.role === "Admin" ||
+                currentUser.role === "BusDev") && <Reporting />}
           </div>
         </main>
       </div>
