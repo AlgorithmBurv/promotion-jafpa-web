@@ -14,6 +14,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Inbox,
+  CalendarDays
 } from "lucide-react";
 
 export default function ManajemenCustomer() {
@@ -23,25 +24,26 @@ export default function ManajemenCustomer() {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterKestabilan, setFilterKestabilan] = useState("Semua");
-  const [filterPembayaran, setFilterPembayaran] = useState("Semua");
-  const [sortBy, setSortBy] = useState("terbaru");
+  const [filterStability, setFilterStability] = useState("All");
+  const [filterPayment, setFilterPayment] = useState("All");
+  const [sortBy, setSortBy] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
+  // Ubah years_active menjadi join_date
   const [formData, setFormData] = useState({
-    nama_customer: "",
-    kestabilan: "Sedang",
-    status_pembayaran: "Lancar",
-    lama_bekerjasama_tahun: 0,
+    name: "",
+    stability: "Medium",
+    payment_status: "Good",
+    join_date: new Date().toISOString().split("T")[0],
   });
 
   const fetchCustomers = async () => {
     try {
       const { data, error } = await supabase
-        .from("master_customer")
+        .from("customers")
         .select("*")
-        .order("id_customer", { ascending: false });
+        .order("id", { ascending: false });
       if (error) throw error;
       setCustomers(data || []);
     } catch (error) {
@@ -55,28 +57,43 @@ export default function ManajemenCustomer() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterKestabilan, filterPembayaran, sortBy]);
+  }, [searchQuery, filterStability, filterPayment, sortBy]);
+
+  // Fungsi Kalkulator Otomatis Tahun Kerjasama
+  const calculateYearsActive = (dateString) => {
+    if (!dateString) return 0;
+    const joinDate = new Date(dateString);
+    const today = new Date();
+    let years = today.getFullYear() - joinDate.getFullYear();
+    const m = today.getMonth() - joinDate.getMonth();
+    // Kurangi 1 tahun jika bulan/tanggal hari ini belum melewati tanggal join di tahun ini
+    if (m < 0 || (m === 0 && today.getDate() < joinDate.getDate())) {
+      years--;
+    }
+    return Math.max(0, years);
+  };
 
   let processedData = [...customers];
   if (searchQuery)
     processedData = processedData.filter((c) =>
-      c.nama_customer.toLowerCase().includes(searchQuery.toLowerCase()),
+      c.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
-  if (filterKestabilan !== "Semua")
+  if (filterStability !== "All")
     processedData = processedData.filter(
-      (c) => c.kestabilan === filterKestabilan,
+      (c) => c.stability === filterStability,
     );
-  if (filterPembayaran !== "Semua")
+  if (filterPayment !== "All")
     processedData = processedData.filter(
-      (c) => c.status_pembayaran === filterPembayaran,
+      (c) => c.payment_status === filterPayment,
     );
 
   processedData.sort((a, b) => {
-    if (sortBy === "terbaru") return b.id_customer - a.id_customer;
-    if (sortBy === "nama_az")
-      return a.nama_customer.localeCompare(b.nama_customer);
-    if (sortBy === "kerjasama_lama")
-      return b.lama_bekerjasama_tahun - a.lama_bekerjasama_tahun;
+    if (sortBy === "newest") return b.id - a.id;
+    if (sortBy === "nama_az") return a.name.localeCompare(b.name);
+    if (sortBy === "kerjasama_lama") {
+      // Yang paling lama gabung adalah yang tanggalnya paling tua (kecil)
+      return new Date(a.join_date) - new Date(b.join_date);
+    }
     return 0;
   });
 
@@ -90,10 +107,10 @@ export default function ManajemenCustomer() {
 
   const resetForm = () => {
     setFormData({
-      nama_customer: "",
-      kestabilan: "Sedang",
-      status_pembayaran: "Lancar",
-      lama_bekerjasama_tahun: 0,
+      name: "",
+      stability: "Medium",
+      payment_status: "Good",
+      join_date: new Date().toISOString().split("T")[0],
     });
     setEditingId(null);
     setIsModalOpen(false);
@@ -105,14 +122,14 @@ export default function ManajemenCustomer() {
     try {
       if (editingId) {
         const { error } = await supabase
-          .from("master_customer")
+          .from("customers")
           .update(formData)
-          .eq("id_customer", editingId);
+          .eq("id", editingId);
         if (error) throw error;
         toast.success("Customer updated!");
       } else {
         const { error } = await supabase
-          .from("master_customer")
+          .from("customers")
           .insert([formData]);
         if (error) throw error;
         toast.success("Customer added.");
@@ -127,12 +144,12 @@ export default function ManajemenCustomer() {
   };
 
   const handleEdit = (customer) => {
-    setEditingId(customer.id_customer);
+    setEditingId(customer.id);
     setFormData({
-      nama_customer: customer.nama_customer,
-      kestabilan: customer.kestabilan || "Sedang",
-      status_pembayaran: customer.status_pembayaran || "Lancar",
-      lama_bekerjasama_tahun: customer.lama_bekerjasama_tahun || 0,
+      name: customer.name,
+      stability: customer.stability || "Medium",
+      payment_status: customer.payment_status || "Good",
+      join_date: customer.join_date || new Date().toISOString().split("T")[0],
     });
     setIsModalOpen(true);
   };
@@ -141,30 +158,15 @@ export default function ManajemenCustomer() {
     if (!window.confirm("Delete this customer?")) return;
     try {
       const { error } = await supabase
-        .from("master_customer")
+        .from("customers")
         .delete()
-        .eq("id_customer", id);
+        .eq("id", id);
       if (error) throw error;
       toast.success("Customer deleted!");
       fetchCustomers();
     } catch (error) {
       toast.error(`Delete failed.`);
     }
-  };
-
-  const getStabilityLabel = (val) => {
-    if (val === "Sangat Baik") return "Excellent";
-    if (val === "Baik") return "Good";
-    if (val === "Sedang") return "Average";
-    if (val === "Kurang") return "Poor";
-    return val;
-  };
-
-  const getPaymentLabel = (val) => {
-    if (val === "Lancar") return "Smooth";
-    if (val === "Tersendat") return "Delayed";
-    if (val === "Macet") return "Blocked";
-    return val;
   };
 
   return (
@@ -203,21 +205,21 @@ export default function ManajemenCustomer() {
             />
           </div>
           <select
-            value={filterPembayaran}
-            onChange={(e) => setFilterPembayaran(e.target.value)}
-            className="lg:w-40 bg-white border border-slate-300 rounded-md py-2 px-3 text-sm outline-none"
+            value={filterPayment}
+            onChange={(e) => setFilterPayment(e.target.value)}
+            className="lg:w-40 bg-white border border-slate-300 rounded-md py-2 px-3 text-sm outline-none cursor-pointer"
           >
-            <option value="Semua">All Payments</option>
-            <option value="Lancar">Smooth</option>
-            <option value="Tersendat">Delayed</option>
-            <option value="Macet">Blocked</option>
+            <option value="All">All Payments</option>
+            <option value="Good">Good</option>
+            <option value="Delayed">Delayed</option>
+            <option value="Bad Debt">Bad Debt</option>
           </select>
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
-            className="lg:w-44 bg-white border border-slate-300 rounded-md py-2 px-3 text-sm outline-none"
+            className="lg:w-44 bg-white border border-slate-300 rounded-md py-2 px-3 text-sm outline-none cursor-pointer"
           >
-            <option value="terbaru">Newest</option>
+            <option value="newest">Newest</option>
             <option value="nama_az">Name A-Z</option>
             <option value="kerjasama_lama">Longest Coop</option>
           </select>
@@ -238,21 +240,27 @@ export default function ManajemenCustomer() {
               {currentRows.length > 0 ? (
                 currentRows.map((c) => (
                   <tr
-                    key={c.id_customer}
+                    key={c.id}
                     className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
                   >
                     <td className="py-3 px-4 font-medium text-slate-800">
-                      {c.nama_customer}
+                      {c.name}
                     </td>
                     <td className="py-3 px-4 text-slate-600">
-                      {c.lama_bekerjasama_tahun} Years
+                      {/* Menampilkan hasil kalkulasi otomatis */}
+                      <span className="font-semibold text-slate-800">{calculateYearsActive(c.join_date)} Years</span>
+                      <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
+                        <CalendarDays size={10} /> Since {new Date(c.join_date).getFullYear()}
+                      </p>
                     </td>
-                    <td className="py-3 px-4 text-slate-600">{getStabilityLabel(c.kestabilan)}</td>
+                    <td className="py-3 px-4 text-slate-600">
+                      {c.stability}
+                    </td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${c.status_pembayaran === "Macet" ? "bg-red-50 text-red-700 border-red-200" : c.status_pembayaran === "Tersendat" ? "bg-yellow-50 text-yellow-700 border-yellow-200" : "bg-green-50 text-green-700 border-green-200"}`}
+                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${c.payment_status === "Bad Debt" ? "bg-red-50 text-red-700 border-red-200" : c.payment_status === "Delayed" ? "bg-yellow-50 text-yellow-700 border-yellow-200" : "bg-green-50 text-green-700 border-green-200"}`}
                       >
-                        {getPaymentLabel(c.status_pembayaran)}
+                        {c.payment_status}
                       </span>
                     </td>
                     <td className="py-3 px-4 flex items-center justify-center gap-2">
@@ -263,7 +271,7 @@ export default function ManajemenCustomer() {
                         <Edit size={14} />
                       </button>
                       <button
-                        onClick={() => handleDelete(c.id_customer)}
+                        onClick={() => handleDelete(c.id)}
                         className="bg-white border border-red-600 text-red-700 hover:bg-red-50 p-1.5 rounded transition-colors"
                       >
                         <Trash2 size={14} />
@@ -340,8 +348,8 @@ export default function ManajemenCustomer() {
                   </label>
                   <input
                     type="text"
-                    name="nama_customer"
-                    value={formData.nama_customer}
+                    name="name"
+                    value={formData.name}
                     onChange={handleChange}
                     required
                     placeholder="e.g. PT ABC"
@@ -349,17 +357,18 @@ export default function ManajemenCustomer() {
                   />
                 </div>
                 <div>
+                  {/* Diubah dari input angka menjadi Date Picker */}
                   <label className="block text-sm font-medium text-slate-700 mb-1">
-                    Coop Duration (Years)
+                    Join Date
                   </label>
                   <input
-                    type="number"
-                    name="lama_bekerjasama_tahun"
-                    value={formData.lama_bekerjasama_tahun}
+                    type="date"
+                    name="join_date"
+                    value={formData.join_date}
                     onChange={handleChange}
-                    min="0"
+                    max={new Date().toISOString().split("T")[0]}
                     required
-                    className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600"
+                    className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 cursor-pointer"
                   />
                 </div>
                 <div>
@@ -367,15 +376,14 @@ export default function ManajemenCustomer() {
                     Business Stability
                   </label>
                   <select
-                    name="kestabilan"
-                    value={formData.kestabilan}
+                    name="stability"
+                    value={formData.stability}
                     onChange={handleChange}
-                    className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 outline-none cursor-pointer"
                   >
-                    <option value="Sangat Baik">Excellent</option>
-                    <option value="Baik">Good</option>
-                    <option value="Sedang">Average</option>
-                    <option value="Kurang">Poor</option>
+                    <option value="High">High</option>
+                    <option value="Medium">Medium</option>
+                    <option value="Low">Low</option>
                   </select>
                 </div>
                 <div>
@@ -383,14 +391,14 @@ export default function ManajemenCustomer() {
                     Payment Status
                   </label>
                   <select
-                    name="status_pembayaran"
-                    value={formData.status_pembayaran}
+                    name="payment_status"
+                    value={formData.payment_status}
                     onChange={handleChange}
-                    className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 outline-none"
+                    className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 outline-none cursor-pointer"
                   >
-                    <option value="Lancar">Smooth</option>
-                    <option value="Tersendat">Delayed</option>
-                    <option value="Macet">Blocked</option>
+                    <option value="Good">Good</option>
+                    <option value="Delayed">Delayed</option>
+                    <option value="Bad Debt">Bad Debt</option>
                   </select>
                 </div>
                 <div className="md:col-span-2 flex justify-end gap-3 pt-5 mt-2 border-t border-slate-200">

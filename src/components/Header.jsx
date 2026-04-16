@@ -37,14 +37,16 @@ export default function Header({ activeMenu, currentUser, toggleSidebar }) {
         <div className="flex items-center gap-3 bg-orange-50 py-1.5 px-2 rounded-full border border-slate-200 shadow-sm hover:shadow-md transition-shadow cursor-default">
           <div className="hidden md:flex flex-col items-end pr-2 pl-3">
             <span className="text-sm font-bold text-slate-800 leading-tight">
-              {currentUser.nama_lengkap}
+              {/* Penyesuaian ke full_name */}
+              {currentUser.full_name}
             </span>
             <span className="text-[10px] font-bold text-orange-600 uppercase tracking-wider">
               {currentUser.role}
             </span>
           </div>
           <div className="w-10 h-10 rounded-full bg-orange-600 text-white flex items-center justify-center font-bold shadow-md">
-            {currentUser.nama_lengkap.charAt(0)}
+            {/* Penyesuaian ke full_name */}
+            {currentUser.full_name.charAt(0)}
           </div>
         </div>
       </div>

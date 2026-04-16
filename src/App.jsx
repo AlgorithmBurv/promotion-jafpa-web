@@ -21,6 +21,7 @@ function App() {
   const [activeMenu, setActiveMenu] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
+  // Nama state tetap dipertahankan agar tidak memecah struktur props ke komponen anak
   const [masterProduk, setMasterProduk] = useState([]);
   const [masterCustomer, setMasterCustomer] = useState([]);
   const [masterPromosi, setMasterPromosi] = useState([]);
@@ -46,37 +47,35 @@ function App() {
     if (!currentUser) return;
 
     try {
+      // Menggunakan nama tabel baru: promotions
       const { data: promosi } = await supabase
-        .from("master_promosi")
+        .from("promotions")
         .select("*")
         .eq("is_active", true);
       setMasterPromosi(promosi || []);
 
       if (currentUser.role === "Sales") {
-        const { data: produk } = await supabase
-          .from("master_produk")
-          .select("*");
-        const { data: customer } = await supabase
-          .from("master_customer")
-          .select("*");
+        // Menggunakan nama tabel baru: products
+        const { data: produk } = await supabase.from("products").select("*");
 
+        // Menggunakan nama tabel baru: customers
+        const { data: customer } = await supabase.from("customers").select("*");
+
+        // Menggunakan nama tabel baru: promotion_requests dan relasi tabel customers, products
         const { data: pengajuan } = await supabase
-          .from("trx_pengajuan_promosi")
-          .select(
-            `*, master_customer ( nama_customer ), master_produk ( nama_produk )`,
-          )
-          .eq("id_sales", currentUser.id_user)
+          .from("promotion_requests")
+          .select(`*, customers ( name ), products ( name )`)
+          .eq("sales_id", currentUser.id) // Menggunakan kolom baru: sales_id dan currentUser.id
           .order("created_at", { ascending: false });
 
         setMasterProduk(produk || []);
         setMasterCustomer(customer || []);
         setDaftarPengajuan(pengajuan || []);
       } else if (currentUser.role === "BusDev") {
+        // Menggunakan nama tabel baru: promotion_requests dan relasi tabel customers, products
         const { data: pengajuanBusdev } = await supabase
-          .from("trx_pengajuan_promosi")
-          .select(
-            `*, master_customer ( nama_customer ), master_produk ( nama_produk )`,
-          )
+          .from("promotion_requests")
+          .select(`*, customers ( name ), products ( name )`)
           .order("created_at", { ascending: false });
 
         setDaftarPengajuan(pengajuanBusdev || []);

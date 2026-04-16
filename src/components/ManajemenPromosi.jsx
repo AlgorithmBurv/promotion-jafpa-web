@@ -32,12 +32,12 @@ export default function ManajemenPromosi({ currentUser }) {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // Menambahkan field tanggal_mulai dan tanggal_selesai
+  // 1. Penyesuaian nama key di formData
   const [formData, setFormData] = useState({
-    nama_promosi: "",
-    syarat_ketentuan: "",
-    tanggal_mulai: "",
-    tanggal_selesai: "",
+    name: "",
+    terms_conditions: "",
+    start_date: "",
+    end_date: "",
     is_active: true,
   });
 
@@ -45,8 +45,9 @@ export default function ManajemenPromosi({ currentUser }) {
 
   const fetchPromos = async () => {
     try {
+      // 2. Ubah nama tabel ke 'promotions'
       let query = supabase
-        .from("master_promosi")
+        .from("promotions")
         .select("*")
         .order("created_at", { ascending: false });
       if (!isAdmin) query = query.eq("is_active", true);
@@ -72,8 +73,9 @@ export default function ManajemenPromosi({ currentUser }) {
   if (searchQuery) {
     processedData = processedData.filter(
       (item) =>
-        item.nama_promosi.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        item.syarat_ketentuan.toLowerCase().includes(searchQuery.toLowerCase()),
+        // 3. Sesuaikan dengan kolom name & terms_conditions
+        item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.terms_conditions.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }
 
@@ -88,10 +90,8 @@ export default function ManajemenPromosi({ currentUser }) {
       return new Date(b.created_at) - new Date(a.created_at);
     if (sortBy === "oldest")
       return new Date(a.created_at) - new Date(b.created_at);
-    if (sortBy === "name_az")
-      return a.nama_promosi.localeCompare(b.nama_promosi);
-    if (sortBy === "name_za")
-      return b.nama_promosi.localeCompare(a.nama_promosi);
+    if (sortBy === "name_az") return a.name.localeCompare(b.name);
+    if (sortBy === "name_za") return b.name.localeCompare(a.name);
     return 0;
   });
 
@@ -105,10 +105,10 @@ export default function ManajemenPromosi({ currentUser }) {
 
   const resetForm = () => {
     setFormData({
-      nama_promosi: "",
-      syarat_ketentuan: "",
-      tanggal_mulai: "",
-      tanggal_selesai: "",
+      name: "",
+      terms_conditions: "",
+      start_date: "",
+      end_date: "",
       is_active: true,
     });
     setEditingId(null);
@@ -122,22 +122,23 @@ export default function ManajemenPromosi({ currentUser }) {
     setIsLoading(true);
     try {
       const payload = {
-        nama_promosi: formData.nama_promosi,
-        syarat_ketentuan: formData.syarat_ketentuan,
-        tanggal_mulai: formData.tanggal_mulai,
-        tanggal_selesai: formData.tanggal_selesai,
+        name: formData.name,
+        terms_conditions: formData.terms_conditions,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
       };
 
       if (editingId) {
+        // 4. Update tabel 'promotions' dan eq 'id'
         const { error } = await supabase
-          .from("master_promosi")
+          .from("promotions")
           .update(payload)
-          .eq("id_promosi", editingId);
+          .eq("id", editingId);
         if (error) throw error;
         toast.success("Promo updated!");
       } else {
         const { error } = await supabase
-          .from("master_promosi")
+          .from("promotions")
           .insert([{ ...payload, is_active: true }]);
         if (error) throw error;
         toast.success("Promo added!");
@@ -152,12 +153,12 @@ export default function ManajemenPromosi({ currentUser }) {
   };
 
   const handleEdit = (item) => {
-    setEditingId(item.id_promosi);
+    setEditingId(item.id);
     setFormData({
-      nama_promosi: item.nama_promosi,
-      syarat_ketentuan: item.syarat_ketentuan,
-      tanggal_mulai: item.tanggal_mulai || "",
-      tanggal_selesai: item.tanggal_selesai || "",
+      name: item.name,
+      terms_conditions: item.terms_conditions,
+      start_date: item.start_date || "",
+      end_date: item.end_date || "",
       is_active: item.is_active,
     });
     setIsModalOpen(true);
@@ -166,10 +167,8 @@ export default function ManajemenPromosi({ currentUser }) {
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this promo permanently?")) return;
     try {
-      const { error } = await supabase
-        .from("master_promosi")
-        .delete()
-        .eq("id_promosi", id);
+      // 5. Hapus dari tabel 'promotions'
+      const { error } = await supabase.from("promotions").delete().eq("id", id);
       if (error) throw error;
       toast.success("Promo deleted!");
       fetchPromos();
@@ -182,9 +181,9 @@ export default function ManajemenPromosi({ currentUser }) {
     if (!isAdmin) return;
     try {
       const { error } = await supabase
-        .from("master_promosi")
+        .from("promotions")
         .update({ is_active: !currentStatus })
-        .eq("id_promosi", id);
+        .eq("id", id);
       if (error) throw error;
       toast.success("Status updated!");
       fetchPromos();
@@ -289,11 +288,11 @@ export default function ManajemenPromosi({ currentUser }) {
               {currentRows.length > 0 ? (
                 currentRows.map((item) => (
                   <tr
-                    key={item.id_promosi}
+                    key={item.id} // 6. Penyesuaian ke item.id
                     className="border-b border-slate-100 hover:bg-slate-50 transition-colors align-top"
                   >
                     <td className="py-3 px-4 font-bold text-slate-800">
-                      {item.nama_promosi}
+                      {item.name}
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-1.5 text-slate-600 text-xs whitespace-nowrap">
@@ -302,14 +301,14 @@ export default function ManajemenPromosi({ currentUser }) {
                           className="text-slate-400 shrink-0"
                         />
                         <span>
-                          {formatDate(item.tanggal_mulai)} <br /> -{" "}
-                          {formatDate(item.tanggal_selesai)}
+                          {formatDate(item.start_date)} <br /> -{" "}
+                          {formatDate(item.end_date)}
                         </span>
                       </div>
                     </td>
                     <td className="py-3 px-4">
                       <div className="text-slate-600 leading-relaxed line-clamp-2">
-                        {item.syarat_ketentuan}
+                        {item.terms_conditions}
                       </div>
                       <button
                         onClick={() => setViewTermsModal(item)}
@@ -328,9 +327,7 @@ export default function ManajemenPromosi({ currentUser }) {
                     {isAdmin && (
                       <td className="py-3 px-4 flex items-center justify-center gap-2 flex-wrap mt-1">
                         <button
-                          onClick={() =>
-                            toggleStatus(item.id_promosi, item.is_active)
-                          }
+                          onClick={() => toggleStatus(item.id, item.is_active)}
                           className="p-1.5 border rounded hover:bg-slate-50 text-slate-700"
                           title={item.is_active ? "Deactivate" : "Activate"}
                         >
@@ -348,7 +345,7 @@ export default function ManajemenPromosi({ currentUser }) {
                           <Edit size={16} />
                         </button>
                         <button
-                          onClick={() => handleDelete(item.id_promosi)}
+                          onClick={() => handleDelete(item.id)}
                           className="p-1.5 border rounded hover:bg-red-50 hover:text-red-700 text-slate-700"
                           title="Delete"
                         >
@@ -412,11 +409,12 @@ export default function ManajemenPromosi({ currentUser }) {
               <div className="flex items-center gap-2 mb-4">
                 <Tags size={20} className="text-orange-600" />
                 <h3 className="text-lg font-bold text-slate-800">
-                  {viewTermsModal.nama_promosi}
+                  {/* 7. Penyesuaian nama kolom pada modal read more */}
+                  {viewTermsModal.name}
                 </h3>
               </div>
               <div className="bg-slate-50 p-4 rounded-md border border-slate-200 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap max-h-60 overflow-y-auto">
-                {viewTermsModal.syarat_ketentuan}
+                {viewTermsModal.terms_conditions}
               </div>
               <div className="mt-6 flex justify-end">
                 <button
@@ -453,10 +451,11 @@ export default function ManajemenPromosi({ currentUser }) {
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Promo Name
                   </label>
+                  {/* 8. Penyesuaian attribute "name" pada input */}
                   <input
                     type="text"
-                    name="nama_promosi"
-                    value={formData.nama_promosi}
+                    name="name"
+                    value={formData.name}
                     onChange={handleChange}
                     required
                     className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-orange-600 outline-none"
@@ -472,8 +471,8 @@ export default function ManajemenPromosi({ currentUser }) {
                     </label>
                     <input
                       type="date"
-                      name="tanggal_mulai"
-                      value={formData.tanggal_mulai}
+                      name="start_date"
+                      value={formData.start_date}
                       onChange={handleChange}
                       required
                       className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-orange-600 outline-none cursor-pointer"
@@ -485,9 +484,9 @@ export default function ManajemenPromosi({ currentUser }) {
                     </label>
                     <input
                       type="date"
-                      name="tanggal_selesai"
-                      min={formData.tanggal_mulai}
-                      value={formData.tanggal_selesai}
+                      name="end_date"
+                      min={formData.start_date}
+                      value={formData.end_date}
                       onChange={handleChange}
                       required
                       className="w-full bg-white border border-slate-300 rounded-md py-2 px-3 text-sm focus:ring-2 focus:ring-orange-600 outline-none cursor-pointer"
@@ -500,8 +499,8 @@ export default function ManajemenPromosi({ currentUser }) {
                     Terms & Conditions
                   </label>
                   <textarea
-                    name="syarat_ketentuan"
-                    value={formData.syarat_ketentuan}
+                    name="terms_conditions"
+                    value={formData.terms_conditions}
                     onChange={handleChange}
                     required
                     rows="3"

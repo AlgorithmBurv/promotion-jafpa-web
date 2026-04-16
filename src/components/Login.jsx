@@ -16,17 +16,19 @@ export default function Login({ onLoginSuccess }) {
     e.preventDefault();
     setIsLoading(true);
     try {
+      // Penyesuaian nama tabel menjadi 'users'
       const { data, error } = await supabase
-        .from('master_users')
-        .select('*')
-        .eq('email', loginForm.email)
-        .eq('password', loginForm.password)
+        .from("users")
+        .select("*")
+        .eq("email", loginForm.email)
+        .eq("password", loginForm.password)
         .single();
 
-      if (error || !data) throw new Error('Invalid email or password!');
-      if (!data.is_active) throw new Error('Account disabled. Contact Admin!');
+      if (error || !data) throw new Error("Invalid email or password!");
+      if (!data.is_active) throw new Error("Account disabled. Contact Admin!");
 
-      toast.success(`Welcome back, ${data.nama_lengkap.split(' ')[0]}!`);
+      // Penyesuaian pemanggilan kolom menjadi 'data.full_name'
+      toast.success(`Welcome back, ${data.full_name.split(" ")[0]}!`);
       onLoginSuccess(data);
     } catch (error) {
       toast.error(error.message);

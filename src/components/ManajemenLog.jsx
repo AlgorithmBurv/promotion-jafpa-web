@@ -10,7 +10,8 @@ export default function ManajemenLog() {
   const [isLoading, setIsLoading] = useState(false);
 
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterTindakan, setFilterTindakan] = useState("All");
+  // Penyesuaian state name menjadi filterAction untuk mencerminkan skema baru
+  const [filterAction, setFilterAction] = useState("All");
   const [sortBy, setSortBy] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
@@ -18,22 +19,25 @@ export default function ManajemenLog() {
   const fetchLogs = async () => {
     setIsLoading(true);
     try {
+      // Penyesuaian nama tabel, relasi, dan kolom sesuai skema baru
       const { data, error } = await supabase
-        .from('log_riwayat_approval')
-        .select(`
+        .from("approval_logs")
+        .select(
+          `
           *,
-          master_users:id_reviewer (nama_lengkap, role),
-          trx_pengajuan_promosi:id_pengajuan (
-             jenis_promosi,
-             master_customer (nama_customer)
+          users:reviewer_id (full_name, role),
+          promotion_requests:request_id (
+             promotion_type,
+             customers (name)
           )
-        `)
-        .order('waktu_tindakan', { ascending: false });
+        `,
+        )
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
       setLogs(data || []);
     } catch (error) {
-      toast.error('Failed to fetch activity logs.');
+      toast.error("Failed to fetch activity logs.");
     } finally {
       setIsLoading(false);
     }
@@ -45,27 +49,33 @@ export default function ManajemenLog() {
 
   useEffect(() => {
     setCurrentPage(1);
-  }, [searchQuery, filterTindakan, sortBy]);
+  }, [searchQuery, filterAction, sortBy]);
 
   let processedData = [...logs];
 
   if (searchQuery) {
-    processedData = processedData.filter(log => {
-      const namaUser = log.master_users?.nama_lengkap?.toLowerCase() || '';
-      const namaCustomer = log.trx_pengajuan_promosi?.master_customer?.nama_customer?.toLowerCase() || '';
-      const catatan = log.catatan_reviewer?.toLowerCase() || '';
+    processedData = processedData.filter((log) => {
+      // Penyesuaian kolom pencarian dengan relasi baru
+      const namaUser = log.users?.full_name?.toLowerCase() || "";
+      const namaCustomer =
+        log.promotion_requests?.customers?.name?.toLowerCase() || "";
+      const catatan = log.reviewer_notes?.toLowerCase() || "";
       const q = searchQuery.toLowerCase();
-      return namaUser.includes(q) || namaCustomer.includes(q) || catatan.includes(q);
+      return (
+        namaUser.includes(q) || namaCustomer.includes(q) || catatan.includes(q)
+      );
     });
   }
 
-  if (filterTindakan !== "All") {
-    processedData = processedData.filter(log => log.tindakan === filterTindakan);
+  if (filterAction !== "All") {
+    // Penyesuaian kolom 'tindakan' menjadi 'action'
+    processedData = processedData.filter((log) => log.action === filterAction);
   }
 
   processedData.sort((a, b) => {
-    const dateA = new Date(a.waktu_tindakan);
-    const dateB = new Date(b.waktu_tindakan);
+    // Penyesuaian kolom 'waktu_tindakan' menjadi 'created_at'
+    const dateA = new Date(a.created_at);
+    const dateB = new Date(b.created_at);
     if (sortBy === "newest") return dateB - dateA;
     if (sortBy === "oldest") return dateA - dateB;
     return 0;
@@ -76,22 +86,19 @@ export default function ManajemenLog() {
   const indexOfFirstRow = indexOfLastRow - rowsPerPage;
   const currentRows = processedData.slice(indexOfFirstRow, indexOfLastRow);
 
-  const renderBadgeTindakan = (tindakan) => {
+  const renderBadgeAction = (action) => {
+    // Penyesuaian value tindakan bahasa inggris
     const badges = {
-      "Submit": "bg-blue-50 text-blue-700 border-blue-200",
-      "Setuju": "bg-green-50 text-green-700 border-green-200",
-      "Tolak": "bg-slate-100 text-slate-700 border-slate-300",
-      "Revisi": "bg-yellow-50 text-yellow-700 border-yellow-200"
-    };
-    const labels = {
-      "Submit": "Submit",
-      "Setuju": "Approve",
-      "Tolak": "Reject",
-      "Revisi": "Revise"
+      Submit: "bg-blue-50 text-blue-700 border-blue-200",
+      Approve: "bg-green-50 text-green-700 border-green-200",
+      Reject: "bg-slate-100 text-slate-700 border-slate-300",
+      Revise: "bg-yellow-50 text-yellow-700 border-yellow-200",
     };
     return (
-      <span className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border ${badges[tindakan] || 'bg-gray-100 text-gray-700'}`}>
-        {labels[tindakan] || tindakan}
+      <span
+        className={`inline-block px-2.5 py-1 rounded-md text-[11px] font-bold uppercase tracking-wider border ${badges[action] || "bg-gray-100 text-gray-700"}`}
+      >
+        {action}
       </span>
     );
   };
@@ -102,9 +109,7 @@ export default function ManajemenLog() {
         <div>
           <div className="flex items-center gap-2 mb-1">
             <History size={20} className="text-orange-600" />
-            <h2 className="text-xl font-bold text-slate-800">
-              Activity Logs
-            </h2>
+            <h2 className="text-xl font-bold text-slate-800">Activity Logs</h2>
           </div>
           <p className="text-sm text-slate-500">
             Monitor all request, revision, and approval history.
@@ -120,7 +125,10 @@ export default function ManajemenLog() {
 
       <div className="flex flex-col md:flex-row gap-3 border-y border-slate-100 py-4 bg-slate-50/50 -mx-6 px-6 md:-mx-8 md:px-8">
         <div className="relative flex-1">
-          <Search className="absolute inset-y-0 left-3 my-auto text-slate-400" size={16} />
+          <Search
+            className="absolute inset-y-0 left-3 my-auto text-slate-400"
+            size={16}
+          />
           <input
             type="text"
             placeholder="Search user, customer, or notes..."
@@ -131,22 +139,29 @@ export default function ManajemenLog() {
         </div>
 
         <div className="relative w-full md:w-48">
-          <Filter className="absolute inset-y-0 left-3 my-auto text-slate-400" size={16} />
+          <Filter
+            className="absolute inset-y-0 left-3 my-auto text-slate-400"
+            size={16}
+          />
           <select
-            value={filterTindakan}
-            onChange={(e) => setFilterTindakan(e.target.value)}
+            value={filterAction}
+            onChange={(e) => setFilterAction(e.target.value)}
             className="w-full bg-white border border-slate-300 rounded-md py-2 pl-10 pr-3 text-sm outline-none appearance-none cursor-pointer"
           >
             <option value="All">All Actions</option>
             <option value="Submit">Submit</option>
-            <option value="Setuju">Approve</option>
-            <option value="Revisi">Revise</option>
-            <option value="Tolak">Reject</option>
+            {/* Value value diubah ke bahasa Inggris sesuai Check constraint skema */}
+            <option value="Approve">Approve</option>
+            <option value="Revise">Revise</option>
+            <option value="Reject">Reject</option>
           </select>
         </div>
 
         <div className="relative w-full md:w-48">
-          <ArrowUpDown className="absolute inset-y-0 left-3 my-auto text-slate-400" size={16} />
+          <ArrowUpDown
+            className="absolute inset-y-0 left-3 my-auto text-slate-400"
+            size={16}
+          />
           <select
             value={sortBy}
             onChange={(e) => setSortBy(e.target.value)}
@@ -178,39 +193,54 @@ export default function ManajemenLog() {
               </tr>
             ) : currentRows.length > 0 ? (
               currentRows.map((log) => (
-                <tr key={log.id_log} className="border-b border-slate-100 hover:bg-slate-50 transition-colors align-top">
+                <tr
+                  key={log.id}
+                  className="border-b border-slate-100 hover:bg-slate-50 transition-colors align-top"
+                >
                   <td className="py-3 px-4 text-slate-500">
                     <div className="text-xs font-medium text-slate-800">
-                      {new Date(log.waktu_tindakan).toLocaleDateString("en-US", { day: "numeric", month: "short", year: "numeric" })}
+                      {new Date(log.created_at).toLocaleDateString("en-US", {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      })}
                     </div>
                     <div className="text-[11px] mt-0.5">
-                      {new Date(log.waktu_tindakan).toLocaleTimeString("en-US", { hour: "2-digit", minute: "2-digit" })}
+                      {new Date(log.created_at).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                      })}
                     </div>
                   </td>
                   <td className="py-3 px-4">
                     <p className="font-semibold text-slate-800">
-                      {log.master_users?.nama_lengkap || "Unknown"}
+                      {log.users?.full_name || "Unknown"}
                     </p>
                     <p className="text-xs text-slate-500">
-                      {log.master_users?.role || "-"}
+                      {log.users?.role || "-"}
                     </p>
                   </td>
                   <td className="py-3 px-4">
                     <p className="font-medium text-slate-800">
-                      {log.trx_pengajuan_promosi?.master_customer?.nama_customer || "Deleted Data"}
+                      {log.promotion_requests?.customers?.name ||
+                        "Deleted Data"}
                     </p>
-                    <p className="text-xs text-slate-500 max-w-[200px] truncate" title={log.trx_pengajuan_promosi?.jenis_promosi}>
-                      {log.trx_pengajuan_promosi?.jenis_promosi || "-"}
+                    <p
+                      className="text-xs text-slate-500 max-w-[200px] truncate"
+                      title={log.promotion_requests?.promotion_type}
+                    >
+                      {log.promotion_requests?.promotion_type || "-"}
                     </p>
                   </td>
-                  <td className="py-3 px-4">
-                    {renderBadgeTindakan(log.tindakan)}
-                  </td>
+                  <td className="py-3 px-4">{renderBadgeAction(log.action)}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-start gap-2 bg-white border border-slate-200 p-2 rounded-md shadow-sm whitespace-normal text-xs text-slate-600">
-                      <FileText size={14} className="shrink-0 text-slate-400 mt-0.5" />
+                      <FileText
+                        size={14}
+                        className="shrink-0 text-slate-400 mt-0.5"
+                      />
                       <span className="leading-relaxed">
-                        {log.catatan_reviewer || "-"}
+                        {log.reviewer_notes || "-"}
                       </span>
                     </div>
                   </td>
@@ -235,16 +265,36 @@ export default function ManajemenLog() {
       {processedData.length > 0 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-slate-100 text-sm text-slate-500">
           <span>
-            Showing <span className="font-bold text-slate-700">{indexOfFirstRow + 1}</span> - <span className="font-bold text-slate-700">{Math.min(indexOfLastRow, processedData.length)}</span> of <span className="font-bold text-slate-700">{processedData.length}</span> logs
+            Showing{" "}
+            <span className="font-bold text-slate-700">
+              {indexOfFirstRow + 1}
+            </span>{" "}
+            -{" "}
+            <span className="font-bold text-slate-700">
+              {Math.min(indexOfLastRow, processedData.length)}
+            </span>{" "}
+            of{" "}
+            <span className="font-bold text-slate-700">
+              {processedData.length}
+            </span>{" "}
+            logs
           </span>
           <div className="flex items-center gap-2">
-            <button onClick={() => setCurrentPage((p) => Math.max(1, p - 1))} disabled={currentPage === 1} className="p-1.5 border rounded-md disabled:opacity-30 hover:bg-slate-50 transition-colors">
+            <button
+              onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
+              disabled={currentPage === 1}
+              className="p-1.5 border rounded-md disabled:opacity-30 hover:bg-slate-50 transition-colors"
+            >
               <ChevronLeft size={18} />
             </button>
             <span className="font-medium text-slate-700 px-2">
               {currentPage} / {totalPages}
             </span>
-            <button onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))} disabled={currentPage === totalPages} className="p-1.5 border rounded-md disabled:opacity-30 hover:bg-slate-50 transition-colors">
+            <button
+              onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+              disabled={currentPage === totalPages}
+              className="p-1.5 border rounded-md disabled:opacity-30 hover:bg-slate-50 transition-colors"
+            >
               <ChevronRight size={18} />
             </button>
           </div>

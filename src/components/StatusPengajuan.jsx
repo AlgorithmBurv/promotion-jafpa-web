@@ -19,17 +19,18 @@ import {
 } from "lucide-react";
 
 export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
+  // 1. Penyesuaian pengecekan value status
   const disetujui = daftarPengajuan.filter(
-    (p) => p.status_terakhir === "Disetujui",
+    (p) => p.status === "Approved",
   );
   const menungguBusDev = daftarPengajuan.filter(
-    (p) => p.status_terakhir === "Menunggu Review BusDev",
+    (p) => p.status === "Pending BusDev",
   );
   const revisiSales = daftarPengajuan.filter(
-    (p) => p.status_terakhir === "Revisi Sales",
+    (p) => p.status === "Sales Revision",
   );
   const ditolak = daftarPengajuan.filter(
-    (p) => p.status_terakhir === "Ditolak",
+    (p) => p.status === "Rejected",
   );
 
   const [modalEdit, setModalEdit] = useState(null);
@@ -45,7 +46,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
 
   const uniqueStatuses = [
     "All",
-    ...Array.from(new Set(daftarPengajuan.map((item) => item.status_terakhir))),
+    ...Array.from(new Set(daftarPengajuan.map((item) => item.status))),
   ];
 
   useEffect(() => {
@@ -54,19 +55,20 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
 
   const bukaDetail = async (item) => {
     let catatanRevisi = null;
-    if (item.status_terakhir === "Revisi Sales") {
+    if (item.status === "Sales Revision") {
       setIsLoading(true);
       try {
+        // 2. Penyesuaian query tabel log, kolom, dan filter tindakan
         const { data } = await supabase
-          .from("log_riwayat_approval")
-          .select("catatan_reviewer")
-          .eq("id_pengajuan", item.id_pengajuan)
-          .eq("tindakan", "Revisi")
-          .order("waktu_tindakan", { ascending: false })
+          .from("approval_logs")
+          .select("reviewer_notes")
+          .eq("request_id", item.id)
+          .eq("action", "Revise")
+          .order("created_at", { ascending: false })
           .limit(1);
 
         if (data && data.length > 0) {
-          catatanRevisi = data[0].catatan_reviewer;
+          catatanRevisi = data[0].reviewer_notes;
         }
       } catch (err) {
         console.error("Failed to fetch logs:", err);
@@ -77,34 +79,36 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
 
     setDetailModalItem({
       ...item,
-      catatan_revisi: catatanRevisi,
+      revision_notes: catatanRevisi,
     });
   };
 
   let processedData = [...daftarPengajuan];
   if (searchQuery) {
+    // 3. Penyesuaian mapping ke relasi customers.name dan promotion_type
     processedData = processedData.filter(
       (item) =>
-        item.master_customer?.nama_customer
+        item.customers?.name
           .toLowerCase()
           .includes(searchQuery.toLowerCase()) ||
-        item.jenis_promosi?.toLowerCase().includes(searchQuery.toLowerCase()),
+        item.promotion_type?.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }
   if (filterStatus !== "All") {
     processedData = processedData.filter(
-      (item) => item.status_terakhir === filterStatus,
+      (item) => item.status === filterStatus,
     );
   }
 
   processedData.sort((a, b) => {
+    // 4. Penyesuaian ke kolom request_date
     if (sortBy === "newest")
-      return new Date(b.tanggal_pengajuan) - new Date(a.tanggal_pengajuan);
+      return new Date(b.request_date) - new Date(a.request_date);
     if (sortBy === "oldest")
-      return new Date(a.tanggal_pengajuan) - new Date(b.tanggal_pengajuan);
+      return new Date(a.request_date) - new Date(b.request_date);
     if (sortBy === "name_az")
-      return (a.master_customer?.nama_customer || "").localeCompare(
-        b.master_customer?.nama_customer || "",
+      return (a.customers?.name || "").localeCompare(
+        b.customers?.name || "",
       );
     return 0;
   });
@@ -118,26 +122,28 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
     e.preventDefault();
     setIsLoading(true);
     try {
+      // 5. Penyesuaian payload update ke tabel promotion_requests
       const { error: updateError } = await supabase
-        .from("trx_pengajuan_promosi")
+        .from("promotion_requests")
         .update({
-          jenis_promosi: modalEdit.jenis_promosi,
-          kuantitas_produk: parseInt(modalEdit.kuantitas_produk),
-          durasi_mulai: modalEdit.durasi_mulai,
-          durasi_selesai: modalEdit.durasi_selesai,
-          keterangan_sales: modalEdit.keterangan_sales,
-          status_terakhir: "Menunggu Review BusDev",
+          promotion_type: modalEdit.promotion_type,
+          quantity: parseInt(modalEdit.quantity),
+          start_date: modalEdit.start_date,
+          end_date: modalEdit.end_date,
+          sales_notes: modalEdit.sales_notes,
+          status: "Pending BusDev",
         })
-        .eq("id_pengajuan", modalEdit.id_pengajuan);
+        .eq("id", modalEdit.id);
 
       if (updateError) throw updateError;
 
-      await supabase.from("log_riwayat_approval").insert([
+      // 6. Penyesuaian payload log riwayat
+      await supabase.from("approval_logs").insert([
         {
-          id_pengajuan: modalEdit.id_pengajuan,
-          id_reviewer: modalEdit.id_sales,
-          tindakan: "Submit",
-          catatan_reviewer: "Revised by Sales based on BusDev notes.",
+          request_id: modalEdit.id,
+          reviewer_id: modalEdit.sales_id,
+          action: "Submit",
+          reviewer_notes: "Revised by Sales based on BusDev notes.",
         },
       ]);
 
@@ -152,24 +158,24 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
   };
 
   const renderStatusBadge = (status) => {
+    // 7. Penyesuaian key badge dan label ke value bahasa Inggris
     const badges = {
-      Disetujui: "bg-green-50 text-green-700 border-green-200",
-      "Menunggu Review BusDev":
-        "bg-orange-50 text-orange-700 border-orange-200",
-      "Revisi Sales": "bg-red-50 text-red-700 border-red-200",
-      Ditolak: "bg-slate-100 text-slate-600 border-slate-300 opacity-90",
+      "Approved": "bg-green-50 text-green-700 border-green-200",
+      "Pending BusDev": "bg-orange-50 text-orange-700 border-orange-200",
+      "Sales Revision": "bg-red-50 text-red-700 border-red-200",
+      "Rejected": "bg-slate-100 text-slate-600 border-slate-300 opacity-90",
     };
     const labels = {
-      Disetujui: "Approved",
-      "Menunggu Review BusDev": "Pending",
-      "Revisi Sales": "Revise",
-      Ditolak: "Rejected",
+      "Approved": "Approved",
+      "Pending BusDev": "Pending",
+      "Sales Revision": "Revise",
+      "Rejected": "Rejected",
     };
     const icons = {
-      Disetujui: <CheckCircle2 size={14} />,
-      "Menunggu Review BusDev": <Clock size={14} />,
-      "Revisi Sales": <AlertCircle size={14} />,
-      Ditolak: <X size={14} />,
+      "Approved": <CheckCircle2 size={14} />,
+      "Pending BusDev": <Clock size={14} />,
+      "Sales Revision": <AlertCircle size={14} />,
+      "Rejected": <X size={14} />,
     };
     return (
       <span
@@ -291,25 +297,25 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
               {currentRows.length > 0 ? (
                 currentRows.map((item, idx) => (
                   <tr
-                    key={item.id_pengajuan}
-                    className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${item.status_terakhir === "Ditolak" ? "bg-slate-50/50" : ""}`}
+                    key={item.id}
+                    className={`border-b border-slate-100 hover:bg-slate-50 transition-colors ${item.status === "Rejected" ? "bg-slate-50/50" : ""}`}
                   >
                     <td className="py-3 px-4 text-slate-500">
                       {indexOfFirstRow + idx + 1}
                     </td>
                     <td className="py-3 px-4 font-medium text-slate-800">
-                      {item.master_customer?.nama_customer}
+                      {item.customers?.name}
                     </td>
                     <td className="py-3 px-4">
                       <span className="block text-xs font-medium text-slate-600 bg-slate-100 px-2 py-0.5 rounded border mb-1 w-fit">
-                        {item.kategori_program || "Reguler"}
+                        {item.program_category || "Regular"}
                       </span>
                       <p className="text-xs text-slate-500">
-                        {item.jenis_promosi}
+                        {item.promotion_type}
                       </p>
                     </td>
                     <td className="py-3 px-4">
-                      {renderStatusBadge(item.status_terakhir)}
+                      {renderStatusBadge(item.status)}
                     </td>
                     <td className="py-3 px-4 flex justify-center gap-2">
                       <button
@@ -319,7 +325,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                       >
                         <Eye size={16} />
                       </button>
-                      {item.status_terakhir === "Revisi Sales" && (
+                      {item.status === "Sales Revision" && (
                         <button
                           onClick={() => setModalEdit(item)}
                           className="p-1.5 bg-white border border-orange-600 text-orange-700 hover:bg-orange-50 rounded transition-colors"
@@ -396,7 +402,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                     Customer
                   </p>
                   <p className="text-sm font-bold text-slate-800">
-                    {detailModalItem.master_customer?.nama_customer}
+                    {detailModalItem.customers?.name}
                   </p>
                 </div>
                 <div>
@@ -405,7 +411,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   </p>
                   <div className="flex items-center gap-1.5 text-sm text-slate-700">
                     <Package size={14} className="text-slate-400" />
-                    {detailModalItem.master_produk?.nama_produk}
+                    {detailModalItem.products?.name}
                   </div>
                 </div>
                 <div>
@@ -415,7 +421,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   <div className="flex items-center gap-1.5 text-sm text-slate-700">
                     <Calendar size={14} className="text-slate-400" />
                     {new Date(
-                      detailModalItem.tanggal_pengajuan,
+                      detailModalItem.request_date,
                     ).toLocaleDateString("en-US", {
                       day: "numeric",
                       month: "short",
@@ -429,12 +435,12 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   </p>
                   <div className="flex items-center gap-1.5 text-sm text-slate-700">
                     <Clock size={14} className="text-slate-400" />
-                    {new Date(detailModalItem.durasi_mulai).toLocaleDateString(
+                    {new Date(detailModalItem.start_date).toLocaleDateString(
                       "en-US",
                     )}{" "}
                     -{" "}
                     {new Date(
-                      detailModalItem.durasi_selesai,
+                      detailModalItem.end_date,
                     ).toLocaleDateString("en-US")}
                   </div>
                 </div>
@@ -442,7 +448,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
                     Current Status
                   </p>
-                  {renderStatusBadge(detailModalItem.status_terakhir)}
+                  {renderStatusBadge(detailModalItem.status)}
                 </div>
               </div>
 
@@ -453,11 +459,11 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   </p>
                   <div className="flex items-start gap-2 flex-col">
                     <span className="inline-block px-2 py-0.5 rounded bg-orange-50 text-orange-700 text-xs font-bold border border-orange-200">
-                      {detailModalItem.kategori_program || "Reguler"}
+                      {detailModalItem.program_category || "Regular"}
                     </span>
                     <p className="text-sm font-medium text-slate-800 flex items-center gap-1.5">
                       <Tag size={14} className="text-slate-400" />
-                      {detailModalItem.jenis_promosi}
+                      {detailModalItem.promotion_type}
                     </p>
                   </div>
                 </div>
@@ -466,7 +472,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                     Quantity (Qty)
                   </p>
                   <p className="text-sm font-bold text-slate-800">
-                    {detailModalItem.kuantitas_produk} Pcs
+                    {detailModalItem.quantity} Pcs
                   </p>
                 </div>
               </div>
@@ -480,7 +486,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                     size={16}
                     className="inline-block mr-1.5 text-slate-400 -mt-0.5"
                   />
-                  {detailModalItem.keterangan_sales || (
+                  {detailModalItem.sales_notes || (
                     <span className="italic text-slate-400">
                       No additional notes.
                     </span>
@@ -488,34 +494,34 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                 </div>
               </div>
 
-              {detailModalItem.catatan_revisi && (
+              {detailModalItem.revision_notes && (
                 <div className="md:col-span-2 p-4 rounded-md bg-red-50 border border-red-200">
                   <p className="text-xs font-bold text-red-700 uppercase flex items-center gap-1.5 mb-2">
                     <AlertCircle size={16} /> Revision Notes
                   </p>
                   <p className="text-sm text-red-900 italic leading-relaxed">
-                    "{detailModalItem.catatan_revisi}"
+                    "{detailModalItem.revision_notes}"
                   </p>
                 </div>
               )}
 
-              {detailModalItem.file_bukti_pendukung && (
+              {detailModalItem.attachment && (
                 <div className="md:col-span-2 mt-2 pt-4 border-t border-slate-100">
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-3">
                     Attachments
                   </p>
                   <div className="flex flex-col sm:flex-row items-start gap-4 p-4 bg-slate-50 rounded-lg border border-slate-200">
-                    {detailModalItem.file_bukti_pendukung.match(
+                    {detailModalItem.attachment.match(
                       /\.(jpeg|jpg|png|webp|gif)(\?.*)?$/i,
                     ) ? (
                       <div className="relative group shrink-0">
                         <img
-                          src={detailModalItem.file_bukti_pendukung}
+                          src={detailModalItem.attachment}
                           alt="Attachment"
                           className="h-24 w-32 object-cover rounded border border-slate-300 shadow-sm"
                         />
                         <a
-                          href={detailModalItem.file_bukti_pendukung}
+                          href={detailModalItem.attachment}
                           target="_blank"
                           rel="noreferrer"
                           className="absolute inset-0 bg-slate-900/60 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-medium rounded transition-opacity backdrop-blur-sm"
@@ -536,7 +542,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                         Document attached to this request.
                       </p>
                       <a
-                        href={detailModalItem.file_bukti_pendukung}
+                        href={detailModalItem.attachment}
                         target="_blank"
                         rel="noreferrer"
                         className="inline-flex items-center gap-1.5 bg-white border border-slate-300 py-1.5 px-4 rounded-md text-xs font-bold text-slate-700 shadow-sm hover:bg-slate-100 transition-colors"
@@ -556,7 +562,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
               >
                 Close
               </button>
-              {detailModalItem.status_terakhir === "Revisi Sales" && (
+              {detailModalItem.status === "Sales Revision" && (
                 <button
                   onClick={() => {
                     setModalEdit(detailModalItem);
@@ -587,11 +593,11 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                 </label>
                 <input
                   type="text"
-                  value={modalEdit.jenis_promosi}
+                  value={modalEdit.promotion_type}
                   onChange={(e) =>
                     setModalEdit({
                       ...modalEdit,
-                      jenis_promosi: e.target.value,
+                      promotion_type: e.target.value,
                     })
                   }
                   className="w-full border border-slate-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600"
@@ -605,11 +611,11 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                 </label>
                 <input
                   type="number"
-                  value={modalEdit.kuantitas_produk}
+                  value={modalEdit.quantity}
                   onChange={(e) =>
                     setModalEdit({
                       ...modalEdit,
-                      kuantitas_produk: e.target.value,
+                      quantity: e.target.value,
                     })
                   }
                   className="w-full border border-slate-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600"
@@ -624,11 +630,11 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   </label>
                   <input
                     type="date"
-                    value={modalEdit.durasi_mulai}
+                    value={modalEdit.start_date}
                     onChange={(e) =>
                       setModalEdit({
                         ...modalEdit,
-                        durasi_mulai: e.target.value,
+                        start_date: e.target.value,
                       })
                     }
                     className="w-full border border-slate-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600"
@@ -641,11 +647,11 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   </label>
                   <input
                     type="date"
-                    value={modalEdit.durasi_selesai}
+                    value={modalEdit.end_date}
                     onChange={(e) =>
                       setModalEdit({
                         ...modalEdit,
-                        durasi_selesai: e.target.value,
+                        end_date: e.target.value,
                       })
                     }
                     className="w-full border border-slate-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600"
@@ -659,11 +665,11 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   Revision Notes
                 </label>
                 <textarea
-                  value={modalEdit.keterangan_sales}
+                  value={modalEdit.sales_notes}
                   onChange={(e) =>
                     setModalEdit({
                       ...modalEdit,
-                      keterangan_sales: e.target.value,
+                      sales_notes: e.target.value,
                     })
                   }
                   className="w-full border border-slate-300 rounded-md p-2 text-sm focus:outline-none focus:ring-2 focus:ring-orange-600 resize-none"

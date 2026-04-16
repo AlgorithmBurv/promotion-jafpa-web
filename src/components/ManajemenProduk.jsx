@@ -26,14 +26,16 @@ export default function ManajemenProduk() {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  const [formData, setFormData] = useState({ nama_produk: "" });
+  // 1. Penyesuaian nama kolom menjadi 'name'
+  const [formData, setFormData] = useState({ name: "" });
 
   const fetchProduk = async () => {
     try {
+      // 2. Penyesuaian nama tabel ke 'products' dan order by 'id'
       const { data, error } = await supabase
-        .from("master_produk")
+        .from("products")
         .select("*")
-        .order("id_produk", { ascending: false });
+        .order("id", { ascending: false });
       if (error) throw error;
       setProduk(data || []);
     } catch (error) {
@@ -51,16 +53,18 @@ export default function ManajemenProduk() {
 
   let processedData = [...produk];
   if (searchQuery) {
+    // 3. Penyesuaian filter pencarian menggunakan item.name
     processedData = processedData.filter((item) =>
-      item.nama_produk.toLowerCase().includes(searchQuery.toLowerCase())
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }
 
   processedData.sort((a, b) => {
-    if (sortBy === "newest") return b.id_produk - a.id_produk;
-    if (sortBy === "oldest") return a.id_produk - b.id_produk;
-    if (sortBy === "nama_az") return a.nama_produk.localeCompare(b.nama_produk);
-    if (sortBy === "nama_za") return b.nama_produk.localeCompare(a.nama_produk);
+    // 4. Penyesuaian sorting berdasarkan 'id' dan 'name'
+    if (sortBy === "newest") return b.id - a.id;
+    if (sortBy === "oldest") return a.id - b.id;
+    if (sortBy === "nama_az") return a.name.localeCompare(b.name);
+    if (sortBy === "nama_za") return b.name.localeCompare(a.name);
     return 0;
   });
 
@@ -73,7 +77,7 @@ export default function ManajemenProduk() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
 
   const resetForm = () => {
-    setFormData({ nama_produk: "" });
+    setFormData({ name: "" });
     setEditingId(null);
     setIsModalOpen(false);
   };
@@ -83,16 +87,15 @@ export default function ManajemenProduk() {
     setIsLoading(true);
     try {
       if (editingId) {
+        // 5. Penyesuaian nama tabel dan query update '.eq("id", editingId)'
         const { error } = await supabase
-          .from("master_produk")
+          .from("products")
           .update(formData)
-          .eq("id_produk", editingId);
+          .eq("id", editingId);
         if (error) throw error;
         toast.success("Product updated!");
       } else {
-        const { error } = await supabase
-          .from("master_produk")
-          .insert([formData]);
+        const { error } = await supabase.from("products").insert([formData]);
         if (error) throw error;
         toast.success("Product added.");
       }
@@ -106,18 +109,16 @@ export default function ManajemenProduk() {
   };
 
   const handleEdit = (item) => {
-    setEditingId(item.id_produk);
-    setFormData({ nama_produk: item.nama_produk });
+    setEditingId(item.id);
+    setFormData({ name: item.name });
     setIsModalOpen(true);
   };
 
   const handleDelete = async (id) => {
     if (!window.confirm("Delete this product?")) return;
     try {
-      const { error } = await supabase
-        .from("master_produk")
-        .delete()
-        .eq("id_produk", id);
+      // 6. Penyesuaian query delete
+      const { error } = await supabase.from("products").delete().eq("id", id);
       if (error) throw error;
       toast.success("Product deleted!");
       fetchProduk();
@@ -188,14 +189,14 @@ export default function ManajemenProduk() {
               {currentRows.length > 0 ? (
                 currentRows.map((p) => (
                   <tr
-                    key={p.id_produk}
+                    key={p.id}
                     className="border-b border-slate-100 hover:bg-slate-50 transition-colors"
                   >
                     <td className="py-3 px-4 text-slate-500 font-mono">
-                      #{p.id_produk}
+                      #{p.id}
                     </td>
                     <td className="py-3 px-4 font-medium text-slate-800">
-                      {p.nama_produk}
+                      {p.name}
                     </td>
                     <td className="py-3 px-4 flex items-center justify-center gap-2">
                       <button
@@ -205,7 +206,7 @@ export default function ManajemenProduk() {
                         <Edit size={14} />
                       </button>
                       <button
-                        onClick={() => handleDelete(p.id_produk)}
+                        onClick={() => handleDelete(p.id)}
                         className="inline-flex items-center gap-1 bg-white border border-red-600 text-red-700 hover:bg-red-50 px-2.5 py-1.5 rounded text-xs font-medium"
                       >
                         <Trash2 size={14} />
@@ -228,7 +229,8 @@ export default function ManajemenProduk() {
         {processedData.length > 0 && (
           <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-sm text-slate-500">
             <span>
-              Showing {currentPage} - {totalPages} of {processedData.length} entries
+              Showing {currentPage} - {totalPages} of {processedData.length}{" "}
+              entries
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -239,7 +241,9 @@ export default function ManajemenProduk() {
                 <ChevronLeft size={18} />
               </button>
               <button
-                onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                onClick={() =>
+                  setCurrentPage((p) => Math.min(totalPages, p + 1))
+                }
                 disabled={currentPage === totalPages}
                 className="p-1.5 border rounded disabled:opacity-30"
               >
@@ -276,8 +280,8 @@ export default function ManajemenProduk() {
                   </label>
                   <input
                     type="text"
-                    name="nama_produk"
-                    value={formData.nama_produk}
+                    name="name" // Penyesuaian menjadi 'name'
+                    value={formData.name}
                     onChange={handleChange}
                     required
                     placeholder="E.g., Chicken Sausage 500g"
