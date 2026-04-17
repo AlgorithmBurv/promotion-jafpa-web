@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import toast from "react-hot-toast";
+import ConfirmModal from "./ConfirmModal";
 import {
   Users,
   UserPlus,
@@ -14,7 +15,7 @@ import {
   ChevronLeft,
   ChevronRight,
   Inbox,
-  CalendarDays
+  CalendarDays,
 } from "lucide-react";
 
 export default function ManajemenCustomer() {
@@ -30,7 +31,12 @@ export default function ManajemenCustomer() {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // Ubah years_active menjadi join_date
+  // State untuk modal konfirmasi delete
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    id: null,
+  });
+
   const [formData, setFormData] = useState({
     name: "",
     stability: "Medium",
@@ -59,14 +65,12 @@ export default function ManajemenCustomer() {
     setCurrentPage(1);
   }, [searchQuery, filterStability, filterPayment, sortBy]);
 
-  // Fungsi Kalkulator Otomatis Tahun Kerjasama
   const calculateYearsActive = (dateString) => {
     if (!dateString) return 0;
     const joinDate = new Date(dateString);
     const today = new Date();
     let years = today.getFullYear() - joinDate.getFullYear();
     const m = today.getMonth() - joinDate.getMonth();
-    // Kurangi 1 tahun jika bulan/tanggal hari ini belum melewati tanggal join di tahun ini
     if (m < 0 || (m === 0 && today.getDate() < joinDate.getDate())) {
       years--;
     }
@@ -91,7 +95,6 @@ export default function ManajemenCustomer() {
     if (sortBy === "newest") return b.id - a.id;
     if (sortBy === "nama_az") return a.name.localeCompare(b.name);
     if (sortBy === "kerjasama_lama") {
-      // Yang paling lama gabung adalah yang tanggalnya paling tua (kecil)
       return new Date(a.join_date) - new Date(b.join_date);
     }
     return 0;
@@ -128,9 +131,7 @@ export default function ManajemenCustomer() {
         if (error) throw error;
         toast.success("Customer updated!");
       } else {
-        const { error } = await supabase
-          .from("customers")
-          .insert([formData]);
+        const { error } = await supabase.from("customers").insert([formData]);
         if (error) throw error;
         toast.success("Customer added.");
       }
@@ -154,13 +155,16 @@ export default function ManajemenCustomer() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this customer?")) return;
+  const handleDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id: id });
+  };
+
+  const executeDelete = async () => {
     try {
       const { error } = await supabase
         .from("customers")
         .delete()
-        .eq("id", id);
+        .eq("id", deleteConfirm.id);
       if (error) throw error;
       toast.success("Customer deleted!");
       fetchCustomers();
@@ -175,9 +179,7 @@ export default function ManajemenCustomer() {
         <div className="mb-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div className="flex items-center gap-2">
             <Users size={20} className="text-orange-600" />
-            <h2 className="text-xl font-bold text-slate-800">
-              Customer List
-            </h2>
+            <h2 className="text-xl font-bold text-slate-800">Customer List</h2>
           </div>
           <button
             onClick={() => {
@@ -247,15 +249,15 @@ export default function ManajemenCustomer() {
                       {c.name}
                     </td>
                     <td className="py-3 px-4 text-slate-600">
-                      {/* Menampilkan hasil kalkulasi otomatis */}
-                      <span className="font-semibold text-slate-800">{calculateYearsActive(c.join_date)} Years</span>
+                      <span className="font-semibold text-slate-800">
+                        {calculateYearsActive(c.join_date)} Years
+                      </span>
                       <p className="text-[10px] text-slate-400 mt-0.5 flex items-center gap-1">
-                        <CalendarDays size={10} /> Since {new Date(c.join_date).getFullYear()}
+                        <CalendarDays size={10} /> Since{" "}
+                        {new Date(c.join_date).getFullYear()}
                       </p>
                     </td>
-                    <td className="py-3 px-4 text-slate-600">
-                      {c.stability}
-                    </td>
+                    <td className="py-3 px-4 text-slate-600">{c.stability}</td>
                     <td className="py-3 px-4">
                       <span
                         className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${c.payment_status === "Bad Debt" ? "bg-red-50 text-red-700 border-red-200" : c.payment_status === "Delayed" ? "bg-yellow-50 text-yellow-700 border-yellow-200" : "bg-green-50 text-green-700 border-green-200"}`}
@@ -282,8 +284,8 @@ export default function ManajemenCustomer() {
               ) : (
                 <tr>
                   <td colSpan="5" className="text-center py-10 text-slate-400">
-                    <Inbox size={32} className="mx-auto mb-2 opacity-20" />{" "}
-                    No data found.
+                    <Inbox size={32} className="mx-auto mb-2 opacity-20" /> No
+                    data found.
                   </td>
                 </tr>
               )}
@@ -294,7 +296,9 @@ export default function ManajemenCustomer() {
         {processedData.length > 0 && (
           <div className="flex items-center justify-between pt-4 border-t border-slate-100 text-sm text-slate-500">
             <span>
-              Showing {indexOfFirstRow + 1} - {Math.min(indexOfLastRow, processedData.length)} of {processedData.length} entries
+              Showing {indexOfFirstRow + 1} -{" "}
+              {Math.min(indexOfLastRow, processedData.length)} of{" "}
+              {processedData.length} entries
             </span>
             <div className="flex items-center gap-2">
               <button
@@ -304,7 +308,9 @@ export default function ManajemenCustomer() {
               >
                 <ChevronLeft size={18} />
               </button>
-              <span className="font-medium text-slate-700">{currentPage} / {totalPages}</span>
+              <span className="font-medium text-slate-700">
+                {currentPage} / {totalPages}
+              </span>
               <button
                 onClick={() =>
                   setCurrentPage((p) => Math.min(totalPages, p + 1))
@@ -357,7 +363,6 @@ export default function ManajemenCustomer() {
                   />
                 </div>
                 <div>
-                  {/* Diubah dari input angka menjadi Date Picker */}
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Join Date
                   </label>
@@ -414,8 +419,7 @@ export default function ManajemenCustomer() {
                     disabled={isLoading}
                     className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white font-medium py-2 px-6 rounded-md text-sm disabled:opacity-50"
                   >
-                    <Save size={16} />{" "}
-                    {editingId ? "Update" : "Save"}
+                    <Save size={16} /> {editingId ? "Update" : "Save"}
                   </button>
                 </div>
               </form>
@@ -423,6 +427,16 @@ export default function ManajemenCustomer() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Customer"
+        message="Are you sure you want to permanently delete this customer? This action cannot be undone."
+        confirmText="Yes, Delete"
+        isDanger={true}
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null })}
+      />
     </div>
   );
 }

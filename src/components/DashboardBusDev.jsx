@@ -1,6 +1,7 @@
-import React, { useState, useEffect } from 'react';
-import { supabase } from '../supabaseClient';
-import toast from 'react-hot-toast';
+import React, { useState, useEffect } from "react";
+import { supabase } from "../supabaseClient";
+import toast from "react-hot-toast";
+import ConfirmModal from "./ConfirmModal";
 import {
   X,
   CheckCircle,
@@ -43,6 +44,9 @@ export default function DashboardBusDev({
   const [sortBy, setSortBy] = useState("newest");
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
+
+  // State untuk modal konfirmasi bulk approve
+  const [confirmBulk, setConfirmBulk] = useState(false);
 
   const uniqueCategories = [
     "All",
@@ -101,8 +105,11 @@ export default function DashboardBusDev({
     }
   };
 
-  const handleBulkApprove = async () => {
-    if (!window.confirm(`Approve ${selectedItems.length} requests?`)) return;
+  const handleBulkApprove = () => {
+    setConfirmBulk(true);
+  };
+
+  const executeBulkApprove = async () => {
     setIsProcessing(true);
     try {
       const { error: updateError } = await supabase
@@ -653,6 +660,15 @@ export default function DashboardBusDev({
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={confirmBulk}
+        title="Approve Requests"
+        message={`Are you sure you want to approve ${selectedItems.length} selected requests?`}
+        confirmText="Yes, Approve"
+        onConfirm={executeBulkApprove}
+        onCancel={() => setConfirmBulk(false)}
+      />
     </div>
   );
 }

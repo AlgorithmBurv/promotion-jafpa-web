@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import toast from "react-hot-toast";
+import ConfirmModal from "./ConfirmModal";
 import {
   Users,
   UserPlus,
@@ -39,7 +40,12 @@ export default function ManajemenUser() {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // 1. Penyesuaian nama_lengkap menjadi full_name
+  // State untuk modal konfirmasi delete
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    id: null,
+  });
+
   const [formData, setFormData] = useState({
     full_name: "",
     email: "",
@@ -50,7 +56,6 @@ export default function ManajemenUser() {
 
   const fetchUsers = async () => {
     try {
-      // 2. Penyesuaian nama tabel menjadi 'users' dan order by 'id'
       const { data, error } = await supabase
         .from("users")
         .select("*")
@@ -75,7 +80,6 @@ export default function ManajemenUser() {
   if (searchQuery) {
     processedData = processedData.filter(
       (user) =>
-        // 3. Penyesuaian filter ke user.full_name
         user.full_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         user.email.toLowerCase().includes(searchQuery.toLowerCase()),
     );
@@ -86,7 +90,6 @@ export default function ManajemenUser() {
   }
 
   processedData.sort((a, b) => {
-    // 4. Penyesuaian sorting berdasarkan 'id' dan 'full_name'
     if (sortBy === "newest") return b.id - a.id;
     if (sortBy === "name_az") return a.full_name.localeCompare(b.full_name);
     if (sortBy === "name_za") return b.full_name.localeCompare(a.full_name);
@@ -120,7 +123,6 @@ export default function ManajemenUser() {
     setIsLoading(true);
     try {
       if (editingId) {
-        // 5. Penyesuaian nama tabel dan eq id
         const { error } = await supabase
           .from("users")
           .update(formData)
@@ -153,11 +155,16 @@ export default function ManajemenUser() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this user permanently?")) return;
+  const handleDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id: id });
+  };
+
+  const executeDelete = async () => {
     try {
-      // 6. Penyesuaian delete ke tabel users
-      const { error } = await supabase.from("users").delete().eq("id", id);
+      const { error } = await supabase
+        .from("users")
+        .delete()
+        .eq("id", deleteConfirm.id);
       if (error) throw error;
       toast.success("User deleted!");
       fetchUsers();
@@ -168,7 +175,6 @@ export default function ManajemenUser() {
 
   const toggleUserStatus = async (id, currentStatus) => {
     try {
-      // 7. Penyesuaian toggle status ke tabel users
       const { error } = await supabase
         .from("users")
         .update({ is_active: !currentStatus })
@@ -394,7 +400,7 @@ export default function ManajemenUser() {
                     />
                     <input
                       type="text"
-                      name="full_name" // 8. Penyesuaian attribute name form
+                      name="full_name"
                       value={formData.full_name}
                       onChange={handleChange}
                       required
@@ -496,6 +502,16 @@ export default function ManajemenUser() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete User"
+        message="Are you sure you want to permanently delete this user? This action cannot be undone."
+        confirmText="Yes, Delete"
+        isDanger={true}
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null })}
+      />
     </div>
   );
 }

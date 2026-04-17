@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import toast from "react-hot-toast";
+import ConfirmModal from "./ConfirmModal";
 import {
   Tags,
   Plus,
@@ -32,7 +33,12 @@ export default function ManajemenPromosi({ currentUser }) {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // 1. Penyesuaian nama key di formData
+  // State untuk modal konfirmasi delete
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    id: null,
+  });
+
   const [formData, setFormData] = useState({
     name: "",
     terms_conditions: "",
@@ -45,7 +51,6 @@ export default function ManajemenPromosi({ currentUser }) {
 
   const fetchPromos = async () => {
     try {
-      // 2. Ubah nama tabel ke 'promotions'
       let query = supabase
         .from("promotions")
         .select("*")
@@ -73,7 +78,6 @@ export default function ManajemenPromosi({ currentUser }) {
   if (searchQuery) {
     processedData = processedData.filter(
       (item) =>
-        // 3. Sesuaikan dengan kolom name & terms_conditions
         item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
         item.terms_conditions.toLowerCase().includes(searchQuery.toLowerCase()),
     );
@@ -129,7 +133,6 @@ export default function ManajemenPromosi({ currentUser }) {
       };
 
       if (editingId) {
-        // 4. Update tabel 'promotions' dan eq 'id'
         const { error } = await supabase
           .from("promotions")
           .update(payload)
@@ -164,11 +167,16 @@ export default function ManajemenPromosi({ currentUser }) {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this promo permanently?")) return;
+  const handleDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id: id });
+  };
+
+  const executeDelete = async () => {
     try {
-      // 5. Hapus dari tabel 'promotions'
-      const { error } = await supabase.from("promotions").delete().eq("id", id);
+      const { error } = await supabase
+        .from("promotions")
+        .delete()
+        .eq("id", deleteConfirm.id);
       if (error) throw error;
       toast.success("Promo deleted!");
       fetchPromos();
@@ -288,7 +296,7 @@ export default function ManajemenPromosi({ currentUser }) {
               {currentRows.length > 0 ? (
                 currentRows.map((item) => (
                   <tr
-                    key={item.id} // 6. Penyesuaian ke item.id
+                    key={item.id}
                     className="border-b border-slate-100 hover:bg-slate-50 transition-colors align-top"
                   >
                     <td className="py-3 px-4 font-bold text-slate-800">
@@ -395,7 +403,6 @@ export default function ManajemenPromosi({ currentUser }) {
         )}
       </div>
 
-      {/* Read More Modal */}
       {viewTermsModal && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 transition-opacity">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md relative">
@@ -409,7 +416,6 @@ export default function ManajemenPromosi({ currentUser }) {
               <div className="flex items-center gap-2 mb-4">
                 <Tags size={20} className="text-orange-600" />
                 <h3 className="text-lg font-bold text-slate-800">
-                  {/* 7. Penyesuaian nama kolom pada modal read more */}
                   {viewTermsModal.name}
                 </h3>
               </div>
@@ -429,7 +435,6 @@ export default function ManajemenPromosi({ currentUser }) {
         </div>
       )}
 
-      {/* Add / Edit Form Modal */}
       {isAdmin && isModalOpen && (
         <div className="fixed inset-0 bg-slate-900/50 flex items-center justify-center p-4 z-50 transition-opacity">
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl relative max-h-[90vh] overflow-y-auto">
@@ -451,7 +456,6 @@ export default function ManajemenPromosi({ currentUser }) {
                   <label className="block text-sm font-medium text-slate-700 mb-1">
                     Promo Name
                   </label>
-                  {/* 8. Penyesuaian attribute "name" pada input */}
                   <input
                     type="text"
                     name="name"
@@ -463,7 +467,6 @@ export default function ManajemenPromosi({ currentUser }) {
                   />
                 </div>
 
-                {/* Tambahan Start Date & End Date */}
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <label className="block text-sm font-medium text-slate-700 mb-1">
@@ -531,6 +534,16 @@ export default function ManajemenPromosi({ currentUser }) {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Promo"
+        message="Are you sure you want to permanently delete this promo? This action cannot be undone."
+        confirmText="Yes, Delete"
+        isDanger={true}
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null })}
+      />
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import toast from "react-hot-toast";
+import ConfirmModal from "./ConfirmModal";
 import {
   Package,
   User,
@@ -33,8 +34,11 @@ export default function FormPengajuan({
   const [searchProduk, setSearchProduk] = useState("");
   const [fileLampiran, setFileLampiran] = useState(null);
 
+  // State untuk modal konfirmasi submit
+  const [confirmSubmit, setConfirmSubmit] = useState(false);
+
   const [formData, setFormData] = useState({
-    product_ids: [], 
+    product_ids: [],
     customer_id: "",
     request_date: new Date().toISOString().split("T")[0],
     program_category: "",
@@ -67,9 +71,7 @@ export default function FormPengajuan({
     if (errors[name]) setErrors({ ...errors, [name]: null });
 
     if (name === "customer_id") {
-      const detail = masterCustomer.find(
-        (c) => c.id.toString() === value,
-      );
+      const detail = masterCustomer.find((c) => c.id.toString() === value);
       setSelectedCustomerDetail(detail || null);
     }
   };
@@ -91,7 +93,7 @@ export default function FormPengajuan({
       if (!formData.program_category)
         newErrors.program_category = "Select promo program";
       if (!formData.customer_id) newErrors.customer_id = "Select customer";
-      if (!formData.product_ids || formData.product_ids.length === 0) 
+      if (!formData.product_ids || formData.product_ids.length === 0)
         newErrors.product_ids = "Select at least one product";
     }
     if (currentStep === 2) {
@@ -129,15 +131,16 @@ export default function FormPengajuan({
     }
   };
 
-  const handleFinalSubmit = async () => {
+  const handleFinalSubmit = () => {
     if (!validateStep(1) || !validateStep(2)) {
       toast.error("Please complete previous steps!");
       return;
     }
+    // Buka konfirmasi modal
+    setConfirmSubmit(true);
+  };
 
-    const isConfirmed = window.confirm(`Submit request for ${formData.product_ids.length} product(s)?`);
-    if (!isConfirmed) return;
-
+  const executeSubmit = async () => {
     setIsLoading(true);
 
     try {
@@ -174,7 +177,6 @@ export default function FormPengajuan({
         fileUrl = publicUrlData.publicUrl;
       }
 
-      // Gabungkan nama produk jadi satu text
       const selectedProductsName = masterProduk
         .filter((p) => formData.product_ids.includes(p.id))
         .map((p) => p.name)
@@ -182,7 +184,7 @@ export default function FormPengajuan({
 
       const payload = {
         sales_id: currentUser.id,
-        target_products: selectedProductsName, 
+        target_products: selectedProductsName,
         customer_id: finalCustomerId,
         request_date: formData.request_date,
         program_category: formData.program_category,
@@ -208,9 +210,9 @@ export default function FormPengajuan({
           reviewer_id: currentUser.id,
           action: "Submit",
           reviewer_notes: `Submitted ${formData.program_category} program.`,
-        }
+        },
       ]);
-      
+
       if (logError) throw logError;
 
       toast.success("Promo request submitted!");
@@ -394,8 +396,10 @@ export default function FormPengajuan({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 pl-8 pr-3 text-xs disabled:opacity-50 outline-none"
                   />
                 </div>
-                
-                <div className={`max-h-48 overflow-y-auto border rounded-md bg-white ${errors.product_ids ? "border-red-500" : "border-slate-300"} ${isPembayaranMacet ? "opacity-50 pointer-events-none bg-slate-50" : ""}`}>
+
+                <div
+                  className={`max-h-48 overflow-y-auto border rounded-md bg-white ${errors.product_ids ? "border-red-500" : "border-slate-300"} ${isPembayaranMacet ? "opacity-50 pointer-events-none bg-slate-50" : ""}`}
+                >
                   {filteredProduk.map((p) => (
                     <label
                       key={p.id}
@@ -407,15 +411,16 @@ export default function FormPengajuan({
                         onChange={(e) => {
                           const isChecked = e.target.checked;
                           let newIds = [...formData.product_ids];
-                          
+
                           if (isChecked) {
                             newIds.push(p.id);
                           } else {
                             newIds = newIds.filter((id) => id !== p.id);
                           }
-                          
+
                           setFormData({ ...formData, product_ids: newIds });
-                          if (errors.product_ids) setErrors({ ...errors, product_ids: null });
+                          if (errors.product_ids)
+                            setErrors({ ...errors, product_ids: null });
                         }}
                         className="rounded border-slate-300 text-orange-600 focus:ring-orange-600 w-4 h-4 cursor-pointer"
                       />
@@ -423,7 +428,9 @@ export default function FormPengajuan({
                     </label>
                   ))}
                   {filteredProduk.length === 0 && (
-                    <p className="text-xs text-slate-500 text-center py-3">No products found.</p>
+                    <p className="text-xs text-slate-500 text-center py-3">
+                      No products found.
+                    </p>
                   )}
                 </div>
 
@@ -621,6 +628,15 @@ export default function FormPengajuan({
           )}
         </div>
       </form>
+
+      <ConfirmModal
+        isOpen={confirmSubmit}
+        title="Submit Request"
+        message={`Are you sure you want to submit request for ${formData.product_ids.length} product(s)?`}
+        confirmText="Yes, Submit"
+        onConfirm={executeSubmit}
+        onCancel={() => setConfirmSubmit(false)}
+      />
     </div>
   );
 }

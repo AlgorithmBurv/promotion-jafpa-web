@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import toast from "react-hot-toast";
+import ConfirmModal from "./ConfirmModal";
 import {
   Package,
   Save,
@@ -26,12 +27,16 @@ export default function ManajemenProduk() {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // 1. Penyesuaian nama kolom menjadi 'name'
+  // State untuk modal konfirmasi delete
+  const [deleteConfirm, setDeleteConfirm] = useState({
+    isOpen: false,
+    id: null,
+  });
+
   const [formData, setFormData] = useState({ name: "" });
 
   const fetchProduk = async () => {
     try {
-      // 2. Penyesuaian nama tabel ke 'products' dan order by 'id'
       const { data, error } = await supabase
         .from("products")
         .select("*")
@@ -53,14 +58,12 @@ export default function ManajemenProduk() {
 
   let processedData = [...produk];
   if (searchQuery) {
-    // 3. Penyesuaian filter pencarian menggunakan item.name
     processedData = processedData.filter((item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()),
     );
   }
 
   processedData.sort((a, b) => {
-    // 4. Penyesuaian sorting berdasarkan 'id' dan 'name'
     if (sortBy === "newest") return b.id - a.id;
     if (sortBy === "oldest") return a.id - b.id;
     if (sortBy === "nama_az") return a.name.localeCompare(b.name);
@@ -87,7 +90,6 @@ export default function ManajemenProduk() {
     setIsLoading(true);
     try {
       if (editingId) {
-        // 5. Penyesuaian nama tabel dan query update '.eq("id", editingId)'
         const { error } = await supabase
           .from("products")
           .update(formData)
@@ -114,11 +116,16 @@ export default function ManajemenProduk() {
     setIsModalOpen(true);
   };
 
-  const handleDelete = async (id) => {
-    if (!window.confirm("Delete this product?")) return;
+  const handleDelete = (id) => {
+    setDeleteConfirm({ isOpen: true, id: id });
+  };
+
+  const executeDelete = async () => {
     try {
-      // 6. Penyesuaian query delete
-      const { error } = await supabase.from("products").delete().eq("id", id);
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", deleteConfirm.id);
       if (error) throw error;
       toast.success("Product deleted!");
       fetchProduk();
@@ -280,7 +287,7 @@ export default function ManajemenProduk() {
                   </label>
                   <input
                     type="text"
-                    name="name" // Penyesuaian menjadi 'name'
+                    name="name"
                     value={formData.name}
                     onChange={handleChange}
                     required
@@ -309,6 +316,16 @@ export default function ManajemenProduk() {
           </div>
         </div>
       )}
+
+      <ConfirmModal
+        isOpen={deleteConfirm.isOpen}
+        title="Delete Product"
+        message="Are you sure you want to permanently delete this product? This action cannot be undone."
+        confirmText="Yes, Delete"
+        isDanger={true}
+        onConfirm={executeDelete}
+        onCancel={() => setDeleteConfirm({ isOpen: false, id: null })}
+      />
     </div>
   );
 }
