@@ -21,7 +21,6 @@ function App() {
   const [activeMenu, setActiveMenu] = useState("");
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
 
-  // Nama state tetap dipertahankan agar tidak memecah struktur props ke komponen anak
   const [masterProduk, setMasterProduk] = useState([]);
   const [masterCustomer, setMasterCustomer] = useState([]);
   const [masterPromosi, setMasterPromosi] = useState([]);
@@ -38,7 +37,6 @@ function App() {
     } else if (user.role === "BusDev") {
       setActiveMenu("review_pengajuan");
     } else {
-      // Default menu untuk Sales diubah menjadi form pengajuan karena dashboard dihapus
       setActiveMenu("form_pengajuan");
     }
   };
@@ -47,7 +45,6 @@ function App() {
     if (!currentUser) return;
 
     try {
-      // Menggunakan nama tabel baru: promotions
       const { data: promosi } = await supabase
         .from("promotions")
         .select("*")
@@ -55,27 +52,24 @@ function App() {
       setMasterPromosi(promosi || []);
 
       if (currentUser.role === "Sales") {
-        // Menggunakan nama tabel baru: products
         const { data: produk } = await supabase.from("products").select("*");
-
-        // Menggunakan nama tabel baru: customers
         const { data: customer } = await supabase.from("customers").select("*");
 
-        // Menggunakan nama tabel baru: promotion_requests dan relasi tabel customers, products
+        // Relasi products dihapus
         const { data: pengajuan } = await supabase
           .from("promotion_requests")
-          .select(`*, customers ( name ), products ( name )`)
-          .eq("sales_id", currentUser.id) // Menggunakan kolom baru: sales_id dan currentUser.id
+          .select(`*, customers ( name )`)
+          .eq("sales_id", currentUser.id)
           .order("created_at", { ascending: false });
 
         setMasterProduk(produk || []);
         setMasterCustomer(customer || []);
         setDaftarPengajuan(pengajuan || []);
       } else if (currentUser.role === "BusDev") {
-        // Menggunakan nama tabel baru: promotion_requests dan relasi tabel customers, products
+        // Relasi products dihapus
         const { data: pengajuanBusdev } = await supabase
           .from("promotion_requests")
-          .select(`*, customers ( name ), products ( name )`)
+          .select(`*, customers ( name )`)
           .order("created_at", { ascending: false });
 
         setDaftarPengajuan(pengajuanBusdev || []);
@@ -121,12 +115,10 @@ function App() {
           />
 
           <div className="p-4 md:p-8 max-w-7xl mx-auto w-full">
-            {/* KOMPONEN INI BISA DIAKSES SEMUA ROLE: Admin (Kelola) & Sales/BusDev (Lihat) */}
             {activeMenu === "promosi" && (
               <ManajemenPromosi currentUser={currentUser} />
             )}
 
-            {/* Menu Khusus Sales */}
             {activeMenu === "form_pengajuan" &&
               currentUser.role === "Sales" && (
                 <FormPengajuan
@@ -149,7 +141,6 @@ function App() {
                 />
               )}
 
-            {/* Menu Khusus BusDev */}
             {activeMenu === "review_pengajuan" &&
               currentUser.role === "BusDev" && (
                 <DashboardBusDev
@@ -159,7 +150,6 @@ function App() {
                 />
               )}
 
-            {/* Menu Khusus Admin */}
             {activeMenu === "manajemen_user" &&
               currentUser.role === "Admin" && <ManajemenUser />}
 
@@ -173,7 +163,6 @@ function App() {
               <ManajemenLog />
             )}
 
-            {/* Izinkan Admin ATAU BusDev untuk melihat Reporting */}
             {activeMenu === "reporting" &&
               (currentUser.role === "Admin" ||
                 currentUser.role === "BusDev") && <Reporting />}

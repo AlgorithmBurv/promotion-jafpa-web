@@ -25,12 +25,10 @@ export default function DashboardBusDev({
   daftarPengajuan,
   onSuccess,
 }) {
-  // 1. Sesuaikan value status
   const pendingReview = daftarPengajuan.filter(
     (p) => p.status === "Pending BusDev",
   );
 
-  // 2. Sesuaikan state actionModal (id_pengajuan -> id, catatan -> notes)
   const [actionModal, setActionModal] = useState({
     isOpen: false,
     type: "",
@@ -46,7 +44,6 @@ export default function DashboardBusDev({
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // 3. Sesuaikan kolom kategori
   const uniqueCategories = [
     "All",
     ...Array.from(
@@ -61,7 +58,6 @@ export default function DashboardBusDev({
 
   let processedData = [...pendingReview];
   if (searchQuery) {
-    // 4. Sesuaikan nama relasi dan kolom (customers.name, promotion_type)
     processedData = processedData.filter(
       (item) =>
         item.customers?.name
@@ -77,7 +73,6 @@ export default function DashboardBusDev({
   }
 
   processedData.sort((a, b) => {
-    // 5. Sesuaikan kolom tanggal
     if (sortBy === "newest")
       return new Date(b.request_date) - new Date(a.request_date);
     if (sortBy === "oldest")
@@ -92,7 +87,7 @@ export default function DashboardBusDev({
 
   const handleSelectAll = (e) => {
     if (e.target.checked) {
-      setSelectedItems(currentRows.map((item) => item.id)); // id_pengajuan -> id
+      setSelectedItems(currentRows.map((item) => item.id));
     } else {
       setSelectedItems([]);
     }
@@ -110,17 +105,15 @@ export default function DashboardBusDev({
     if (!window.confirm(`Approve ${selectedItems.length} requests?`)) return;
     setIsProcessing(true);
     try {
-      // 6. Sesuaikan nama tabel dan kolom
       const { error: updateError } = await supabase
         .from("promotion_requests")
         .update({ status: "Approved" })
         .in("id", selectedItems);
       if (updateError) throw updateError;
 
-      // 7. Sesuaikan payload log
       const logData = selectedItems.map((id) => ({
         request_id: id,
-        reviewer_id: currentUser.id, // id_user -> id
+        reviewer_id: currentUser.id,
         action: "Approve",
         reviewer_notes: "Bulk approved by BusDev",
       }));
@@ -146,7 +139,6 @@ export default function DashboardBusDev({
     setIsProcessing(true);
     const { id, type, notes } = actionModal;
 
-    // 8. Sesuaikan pengecekan status
     if ((type === "Sales Revision" || type === "Rejected") && !notes.trim()) {
       toast.error(`Reason required!`);
       setIsProcessing(false);
@@ -154,7 +146,6 @@ export default function DashboardBusDev({
     }
 
     try {
-      // 9. Sesuaikan nama tabel dan query update
       const { error: updateError } = await supabase
         .from("promotion_requests")
         .update({ status: type })
@@ -165,7 +156,6 @@ export default function DashboardBusDev({
       if (type === "Approved") tindakanLog = "Approve";
       if (type === "Rejected") tindakanLog = "Reject";
 
-      // 10. Sesuaikan nama tabel log dan payload insert
       const { error: logError } = await supabase.from("approval_logs").insert([
         {
           request_id: id,
@@ -282,7 +272,7 @@ export default function DashboardBusDev({
           <tbody>
             {currentRows.length > 0 ? (
               currentRows.map((item) => {
-                const isChecked = selectedItems.includes(item.id); // 11. id_pengajuan -> id
+                const isChecked = selectedItems.includes(item.id);
 
                 return (
                   <tr
@@ -299,7 +289,6 @@ export default function DashboardBusDev({
                     </td>
                     <td className="py-3 px-4">
                       <div className="font-medium text-slate-800">
-                        {/* 12. request_date */}
                         {new Date(item.request_date).toLocaleDateString(
                           "en-US",
                           { day: "numeric", month: "short", year: "numeric" },
@@ -307,7 +296,6 @@ export default function DashboardBusDev({
                       </div>
                       <div className="text-xs text-slate-500 mt-1 flex items-center gap-1">
                         <Calendar size={12} className="shrink-0" />
-                        {/* 13. start_date & end_date */}
                         {new Date(item.start_date).toLocaleDateString("en-US", {
                           day: "numeric",
                           month: "short",
@@ -329,7 +317,7 @@ export default function DashboardBusDev({
                       </p>
                     </td>
                     <td className="py-3 px-4 text-slate-700 font-medium">
-                      {item.quantity} Pcs
+                      {item.quantity} Kg
                     </td>
                     <td className="py-3 px-4">
                       <span className="px-2 py-1 rounded bg-orange-50 text-orange-700 text-xs font-bold border border-orange-200">
@@ -344,7 +332,6 @@ export default function DashboardBusDev({
                       >
                         <Eye size={16} />
                       </button>
-                      {/* 14. Ubah status modal -> 'Approved', 'Sales Revision', 'Rejected' */}
                       <button
                         onClick={() => openActionModal(item.id, "Approved")}
                         className="p-1.5 border border-green-600 text-green-700 hover:bg-green-50 rounded"
@@ -475,9 +462,9 @@ export default function DashboardBusDev({
                   <p className="text-xs font-semibold text-slate-500 uppercase mb-1">
                     Product
                   </p>
-                  <div className="flex items-center gap-1.5 text-sm text-slate-700">
-                    <Package size={14} className="text-slate-400" />
-                    {detailModalItem.products?.name}
+                  <div className="flex items-start gap-1.5 text-sm text-slate-700">
+                    <Package size={14} className="text-slate-400 mt-0.5" />
+                    <span>{detailModalItem.target_products}</span>
                   </div>
                 </div>
               </div>
@@ -501,7 +488,7 @@ export default function DashboardBusDev({
                     Quantity
                   </p>
                   <p className="text-sm font-bold text-slate-800">
-                    {detailModalItem.quantity} Pcs
+                    {detailModalItem.quantity} Kg
                   </p>
                 </div>
               </div>
@@ -626,7 +613,6 @@ export default function DashboardBusDev({
                 <label className="block text-sm font-medium mb-1">
                   Reason <span className="text-red-500">*</span>
                 </label>
-                {/* 15. actionModal.catatan -> actionModal.notes */}
                 <textarea
                   rows="3"
                   value={actionModal.notes}

@@ -23,15 +23,13 @@ export default function Reporting() {
   const fetchReports = async () => {
     setIsLoading(true);
     try {
-      // Penyesuaian nama tabel, foreign key (sales_id), dan kolom relasi
       const { data, error } = await supabase
         .from("promotion_requests")
         .select(
           `
           *,
           users:sales_id (full_name),
-          customers (name),
-          products (name)
+          customers (name)
         `,
         )
         .order("request_date", { ascending: false });
@@ -53,7 +51,6 @@ export default function Reporting() {
     setCurrentPage(1);
   }, [searchQuery, filterStatus, filterCategory, startDate, endDate, sortBy]);
 
-  // Penyesuaian kolom status dan kategori
   const uniqueStatuses = [
     "All",
     ...Array.from(new Set(reportsData.map((item) => item.status))),
@@ -68,7 +65,6 @@ export default function Reporting() {
   let processedData = [...reportsData];
 
   if (searchQuery) {
-    // Penyesuaian path state ke bahasa Inggris (customers.name, users.full_name, promotion_type)
     processedData = processedData.filter(
       (item) =>
         item.customers?.name
@@ -123,7 +119,7 @@ export default function Reporting() {
       Date: new Date(item.request_date).toLocaleDateString("en-US"),
       Sales: item.users?.full_name,
       Customer: item.customers?.name,
-      Product: item.products?.name,
+      Product: item.target_products,
       Category: item.program_category || "Regular",
       Promo: item.promotion_type,
       Status: item.status,
@@ -144,7 +140,6 @@ export default function Reporting() {
   };
 
   const renderStatusBadge = (status) => {
-    // Penyesuaian mapping label status bahasa inggris
     const badges = {
       Approved: "bg-green-50 text-green-700 border-green-200",
       "Pending BusDev": "bg-orange-50 text-orange-700 border-orange-200",
@@ -324,9 +319,9 @@ export default function Reporting() {
                     </p>
                     <p
                       className="text-xs text-slate-500 mt-1 truncate max-w-[200px]"
-                      title={item.products?.name}
+                      title={item.target_products}
                     >
-                      {item.products?.name}
+                      {item.target_products}
                     </p>
                   </td>
                   <td className="py-3 px-4 text-center">

@@ -33,9 +33,8 @@ export default function FormPengajuan({
   const [searchProduk, setSearchProduk] = useState("");
   const [fileLampiran, setFileLampiran] = useState(null);
 
-  // 1. Penyesuaian key state formData
   const [formData, setFormData] = useState({
-    product_id: "",
+    product_ids: [], 
     customer_id: "",
     request_date: new Date().toISOString().split("T")[0],
     program_category: "",
@@ -56,7 +55,7 @@ export default function FormPengajuan({
     ) {
       setFormData((prev) => ({
         ...prev,
-        program_category: masterPromosi[0].name, // nama_promosi -> name
+        program_category: masterPromosi[0].name,
       }));
     }
   }, [masterPromosi]);
@@ -69,13 +68,12 @@ export default function FormPengajuan({
 
     if (name === "customer_id") {
       const detail = masterCustomer.find(
-        (c) => c.id.toString() === value, // id_customer -> id
+        (c) => c.id.toString() === value,
       );
       setSelectedCustomerDetail(detail || null);
     }
   };
 
-  // 2. Penyesuaian ke c.name dan p.name
   const filteredCustomers = masterCustomer.filter((c) =>
     c.name.toLowerCase().includes(searchCustomer.toLowerCase()),
   );
@@ -83,7 +81,6 @@ export default function FormPengajuan({
     p.name.toLowerCase().includes(searchProduk.toLowerCase()),
   );
 
-  // 3. Penyesuaian check enum payment_status
   const isPembayaranMacet =
     selectedCustomerDetail?.payment_status === "Bad Debt" ||
     selectedCustomerDetail?.payment_status === "Delayed";
@@ -94,7 +91,8 @@ export default function FormPengajuan({
       if (!formData.program_category)
         newErrors.program_category = "Select promo program";
       if (!formData.customer_id) newErrors.customer_id = "Select customer";
-      if (!formData.product_id) newErrors.product_id = "Select product";
+      if (!formData.product_ids || formData.product_ids.length === 0) 
+        newErrors.product_ids = "Select at least one product";
     }
     if (currentStep === 2) {
       if (!formData.promotion_type)
@@ -137,7 +135,7 @@ export default function FormPengajuan({
       return;
     }
 
-    const isConfirmed = window.confirm("Submit this request?");
+    const isConfirmed = window.confirm(`Submit request for ${formData.product_ids.length} product(s)?`);
     if (!isConfirmed) return;
 
     setIsLoading(true);
@@ -145,7 +143,6 @@ export default function FormPengajuan({
     try {
       const finalCustomerId = parseInt(formData.customer_id);
 
-      // 4. Penyesuaian query check overlapping promo
       const { data: existingPromos, error: checkError } = await supabase
         .from("promotion_requests")
         .select("start_date, end_date")
@@ -177,38 +174,44 @@ export default function FormPengajuan({
         fileUrl = publicUrlData.publicUrl;
       }
 
-      // 5. Penyesuaian nama tabel dan mapping payload ke schema bahasa Inggris
+      // Gabungkan nama produk jadi satu text
+      const selectedProductsName = masterProduk
+        .filter((p) => formData.product_ids.includes(p.id))
+        .map((p) => p.name)
+        .join(", ");
+
+      const payload = {
+        sales_id: currentUser.id,
+        target_products: selectedProductsName, 
+        customer_id: finalCustomerId,
+        request_date: formData.request_date,
+        program_category: formData.program_category,
+        quantity: parseInt(formData.quantity),
+        promotion_type: formData.promotion_type,
+        start_date: formData.start_date,
+        end_date: formData.end_date,
+        sales_notes: formData.sales_notes,
+        attachment: fileUrl,
+        status: "Pending BusDev",
+      };
+
       const { data: trxData, error: trxError } = await supabase
         .from("promotion_requests")
-        .insert([
-          {
-            sales_id: currentUser.id, // id_user -> id
-            product_id: parseInt(formData.product_id),
-            customer_id: finalCustomerId,
-            request_date: formData.request_date,
-            program_category: formData.program_category,
-            quantity: parseInt(formData.quantity),
-            promotion_type: formData.promotion_type,
-            start_date: formData.start_date,
-            end_date: formData.end_date,
-            sales_notes: formData.sales_notes,
-            attachment: fileUrl,
-            status: "Pending BusDev",
-          },
-        ])
+        .insert([payload])
         .select();
 
       if (trxError) throw trxError;
 
-      // 6. Penyesuaian nama tabel approval_logs dan log payload
-      await supabase.from("approval_logs").insert([
+      const { error: logError } = await supabase.from("approval_logs").insert([
         {
-          request_id: trxData[0].id, // id_pengajuan -> id
+          request_id: trxData[0].id,
           reviewer_id: currentUser.id,
           action: "Submit",
           reviewer_notes: `Submitted ${formData.program_category} program.`,
-        },
+        }
       ]);
+      
+      if (logError) throw logError;
 
       toast.success("Promo request submitted!");
       onSuccess();
@@ -268,13 +271,13 @@ export default function FormPengajuan({
               <div className="grid grid-cols-2 md:grid-cols-5 gap-2">
                 {masterPromosi.map((prog) => (
                   <label
-                    key={prog.id} // id_promosi -> id
+                    key={prog.id}
                     className={`cursor-pointer border rounded-md p-3 text-center transition-all ${formData.program_category === prog.name ? "border-orange-600 bg-orange-50 text-orange-600 ring-1 ring-orange-600" : "border-slate-300 bg-white hover:bg-slate-50 text-slate-600"}`}
                   >
                     <input
                       type="radio"
                       name="program_category"
-                      value={prog.name} // nama_promosi -> name
+                      value={prog.name}
                       checked={formData.program_category === prog.name}
                       onChange={handleFormChange}
                       className="sr-only"
@@ -316,7 +319,7 @@ export default function FormPengajuan({
                     size={16}
                   />
                   <select
-                    name="customer_id" // id_customer -> customer_id
+                    name="customer_id"
                     value={formData.customer_id}
                     onChange={handleFormChange}
                     className={`w-full bg-white border rounded-md py-2 pl-9 pr-8 text-sm focus:ring-2 focus:ring-orange-600 appearance-none outline-none ${errors.customer_id ? "border-red-500" : "border-slate-300"}`}
@@ -375,7 +378,7 @@ export default function FormPengajuan({
 
               <div>
                 <label className="block text-sm font-medium text-slate-700 mb-1">
-                  Target Product
+                  Target Product(s)
                 </label>
                 <div className="relative mb-2">
                   <Search
@@ -391,37 +394,47 @@ export default function FormPengajuan({
                     className="w-full bg-slate-50 border border-slate-200 rounded-md py-1.5 pl-8 pr-3 text-xs disabled:opacity-50 outline-none"
                   />
                 </div>
-                <div className="relative">
-                  <Package
-                    className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    size={16}
-                  />
-                  <select
-                    name="product_id" // id_produk -> product_id
-                    value={formData.product_id}
-                    onChange={handleFormChange}
-                    disabled={isPembayaranMacet}
-                    className={`w-full bg-white border rounded-md py-2 pl-9 pr-8 text-sm focus:ring-2 focus:ring-orange-600 appearance-none disabled:bg-slate-100 outline-none ${errors.product_id ? "border-red-500" : "border-slate-300"}`}
-                  >
-                    <option value="" disabled>
-                      -- Select Product --
-                    </option>
-                    {filteredProduk.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
-                  <ChevronDown
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400"
-                    size={16}
-                  />
+                
+                <div className={`max-h-48 overflow-y-auto border rounded-md bg-white ${errors.product_ids ? "border-red-500" : "border-slate-300"} ${isPembayaranMacet ? "opacity-50 pointer-events-none bg-slate-50" : ""}`}>
+                  {filteredProduk.map((p) => (
+                    <label
+                      key={p.id}
+                      className="flex items-center gap-3 p-2.5 hover:bg-slate-50 cursor-pointer border-b border-slate-100 last:border-0 transition-colors"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={formData.product_ids.includes(p.id)}
+                        onChange={(e) => {
+                          const isChecked = e.target.checked;
+                          let newIds = [...formData.product_ids];
+                          
+                          if (isChecked) {
+                            newIds.push(p.id);
+                          } else {
+                            newIds = newIds.filter((id) => id !== p.id);
+                          }
+                          
+                          setFormData({ ...formData, product_ids: newIds });
+                          if (errors.product_ids) setErrors({ ...errors, product_ids: null });
+                        }}
+                        className="rounded border-slate-300 text-orange-600 focus:ring-orange-600 w-4 h-4 cursor-pointer"
+                      />
+                      <span className="text-sm text-slate-700">{p.name}</span>
+                    </label>
+                  ))}
+                  {filteredProduk.length === 0 && (
+                    <p className="text-xs text-slate-500 text-center py-3">No products found.</p>
+                  )}
                 </div>
-                {errors.product_id && (
-                  <p className="text-red-500 text-xs mt-1">
-                    {errors.product_id}
-                  </p>
-                )}
+
+                <div className="mt-1 flex justify-between items-center">
+                  <span className="text-[10px] font-semibold text-slate-500 uppercase">
+                    {formData.product_ids.length} Selected
+                  </span>
+                  {errors.product_ids && (
+                    <p className="text-red-500 text-xs">{errors.product_ids}</p>
+                  )}
+                </div>
               </div>
             </div>
           </div>
@@ -440,7 +453,7 @@ export default function FormPengajuan({
                 />
                 <input
                   type="text"
-                  name="promotion_type" // jenis_promosi -> promotion_type
+                  name="promotion_type"
                   value={formData.promotion_type}
                   onChange={handleFormChange}
                   placeholder="E.g., 10% Discount + Sample"
@@ -456,7 +469,7 @@ export default function FormPengajuan({
 
             <div>
               <label className="block text-sm font-medium text-slate-700 mb-1">
-                Quantity (Qty)
+                Quantity (Kg)
               </label>
               <div className="relative">
                 <Package
@@ -465,7 +478,7 @@ export default function FormPengajuan({
                 />
                 <input
                   type="number"
-                  name="quantity" // kuantitas_produk -> quantity
+                  name="quantity"
                   min="0"
                   value={formData.quantity}
                   onChange={handleFormChange}
@@ -485,7 +498,7 @@ export default function FormPengajuan({
                 </label>
                 <input
                   type="date"
-                  name="start_date" // durasi_mulai -> start_date
+                  name="start_date"
                   min={todayDate}
                   value={formData.start_date}
                   onChange={handleFormChange}
@@ -503,7 +516,7 @@ export default function FormPengajuan({
                 </label>
                 <input
                   type="date"
-                  name="end_date" // durasi_selesai -> end_date
+                  name="end_date"
                   min={formData.start_date || todayDate}
                   value={formData.end_date}
                   onChange={handleFormChange}
@@ -524,7 +537,7 @@ export default function FormPengajuan({
                 Additional Notes
               </label>
               <textarea
-                name="sales_notes" // keterangan_sales -> sales_notes
+                name="sales_notes"
                 value={formData.sales_notes}
                 onChange={handleFormChange}
                 rows="3"

@@ -19,19 +19,14 @@ import {
 } from "lucide-react";
 
 export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
-  // 1. Penyesuaian pengecekan value status
-  const disetujui = daftarPengajuan.filter(
-    (p) => p.status === "Approved",
-  );
+  const disetujui = daftarPengajuan.filter((p) => p.status === "Approved");
   const menungguBusDev = daftarPengajuan.filter(
     (p) => p.status === "Pending BusDev",
   );
   const revisiSales = daftarPengajuan.filter(
     (p) => p.status === "Sales Revision",
   );
-  const ditolak = daftarPengajuan.filter(
-    (p) => p.status === "Rejected",
-  );
+  const ditolak = daftarPengajuan.filter((p) => p.status === "Rejected");
 
   const [modalEdit, setModalEdit] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -58,7 +53,6 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
     if (item.status === "Sales Revision") {
       setIsLoading(true);
       try {
-        // 2. Penyesuaian query tabel log, kolom, dan filter tindakan
         const { data } = await supabase
           .from("approval_logs")
           .select("reviewer_notes")
@@ -85,7 +79,6 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
 
   let processedData = [...daftarPengajuan];
   if (searchQuery) {
-    // 3. Penyesuaian mapping ke relasi customers.name dan promotion_type
     processedData = processedData.filter(
       (item) =>
         item.customers?.name
@@ -101,15 +94,12 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
   }
 
   processedData.sort((a, b) => {
-    // 4. Penyesuaian ke kolom request_date
     if (sortBy === "newest")
       return new Date(b.request_date) - new Date(a.request_date);
     if (sortBy === "oldest")
       return new Date(a.request_date) - new Date(b.request_date);
     if (sortBy === "name_az")
-      return (a.customers?.name || "").localeCompare(
-        b.customers?.name || "",
-      );
+      return (a.customers?.name || "").localeCompare(b.customers?.name || "");
     return 0;
   });
 
@@ -122,7 +112,6 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
     e.preventDefault();
     setIsLoading(true);
     try {
-      // 5. Penyesuaian payload update ke tabel promotion_requests
       const { error: updateError } = await supabase
         .from("promotion_requests")
         .update({
@@ -137,7 +126,6 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
 
       if (updateError) throw updateError;
 
-      // 6. Penyesuaian payload log riwayat
       await supabase.from("approval_logs").insert([
         {
           request_id: modalEdit.id,
@@ -158,24 +146,23 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
   };
 
   const renderStatusBadge = (status) => {
-    // 7. Penyesuaian key badge dan label ke value bahasa Inggris
     const badges = {
-      "Approved": "bg-green-50 text-green-700 border-green-200",
+      Approved: "bg-green-50 text-green-700 border-green-200",
       "Pending BusDev": "bg-orange-50 text-orange-700 border-orange-200",
       "Sales Revision": "bg-red-50 text-red-700 border-red-200",
-      "Rejected": "bg-slate-100 text-slate-600 border-slate-300 opacity-90",
+      Rejected: "bg-slate-100 text-slate-600 border-slate-300 opacity-90",
     };
     const labels = {
-      "Approved": "Approved",
+      Approved: "Approved",
       "Pending BusDev": "Pending",
       "Sales Revision": "Revise",
-      "Rejected": "Rejected",
+      Rejected: "Rejected",
     };
     const icons = {
-      "Approved": <CheckCircle2 size={14} />,
+      Approved: <CheckCircle2 size={14} />,
       "Pending BusDev": <Clock size={14} />,
       "Sales Revision": <AlertCircle size={14} />,
-      "Rejected": <X size={14} />,
+      Rejected: <X size={14} />,
     };
     return (
       <span
@@ -313,6 +300,12 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                       <p className="text-xs text-slate-500">
                         {item.promotion_type}
                       </p>
+                      <p
+                        className="text-xs text-slate-500 mt-1 truncate max-w-[200px]"
+                        title={item.target_products}
+                      >
+                        {item.target_products}
+                      </p>
                     </td>
                     <td className="py-3 px-4">
                       {renderStatusBadge(item.status)}
@@ -409,9 +402,9 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">
                     Target Product
                   </p>
-                  <div className="flex items-center gap-1.5 text-sm text-slate-700">
-                    <Package size={14} className="text-slate-400" />
-                    {detailModalItem.products?.name}
+                  <div className="flex items-start gap-1.5 text-sm text-slate-700">
+                    <Package size={14} className="text-slate-400 mt-0.5" />
+                    <span>{detailModalItem.target_products}</span>
                   </div>
                 </div>
                 <div>
@@ -420,13 +413,14 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                   </p>
                   <div className="flex items-center gap-1.5 text-sm text-slate-700">
                     <Calendar size={14} className="text-slate-400" />
-                    {new Date(
-                      detailModalItem.request_date,
-                    ).toLocaleDateString("en-US", {
-                      day: "numeric",
-                      month: "short",
-                      year: "numeric",
-                    })}
+                    {new Date(detailModalItem.request_date).toLocaleDateString(
+                      "en-US",
+                      {
+                        day: "numeric",
+                        month: "short",
+                        year: "numeric",
+                      },
+                    )}
                   </div>
                 </div>
                 <div>
@@ -439,9 +433,9 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                       "en-US",
                     )}{" "}
                     -{" "}
-                    {new Date(
-                      detailModalItem.end_date,
-                    ).toLocaleDateString("en-US")}
+                    {new Date(detailModalItem.end_date).toLocaleDateString(
+                      "en-US",
+                    )}
                   </div>
                 </div>
                 <div>
@@ -472,7 +466,7 @@ export default function StatusPengajuan({ daftarPengajuan, onSuccess }) {
                     Quantity (Qty)
                   </p>
                   <p className="text-sm font-bold text-slate-800">
-                    {detailModalItem.quantity} Pcs
+                    {detailModalItem.quantity} Kg
                   </p>
                 </div>
               </div>
