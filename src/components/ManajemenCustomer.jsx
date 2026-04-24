@@ -31,7 +31,6 @@ export default function ManajemenCustomer() {
   const [currentPage, setCurrentPage] = useState(1);
   const rowsPerPage = 10;
 
-  // State untuk modal konfirmasi delete
   const [deleteConfirm, setDeleteConfirm] = useState({
     isOpen: false,
     id: null,
@@ -215,6 +214,7 @@ export default function ManajemenCustomer() {
             <option value="Good">Good</option>
             <option value="Delayed">Delayed</option>
             <option value="Bad Debt">Bad Debt</option>
+            <option value="Not Defined">Not Defined</option>
           </select>
           <select
             value={sortBy}
@@ -260,7 +260,7 @@ export default function ManajemenCustomer() {
                     <td className="py-3 px-4 text-slate-600">{c.stability}</td>
                     <td className="py-3 px-4">
                       <span
-                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${c.payment_status === "Bad Debt" ? "bg-red-50 text-red-700 border-red-200" : c.payment_status === "Delayed" ? "bg-yellow-50 text-yellow-700 border-yellow-200" : "bg-green-50 text-green-700 border-green-200"}`}
+                        className={`inline-block px-2 py-0.5 rounded text-xs font-medium border ${c.payment_status === "Bad Debt" ? "bg-red-50 text-red-700 border-red-200" : c.payment_status === "Delayed" ? "bg-yellow-50 text-yellow-700 border-yellow-200" : c.payment_status === "Not Defined" ? "bg-slate-100 text-slate-600 border-slate-300" : "bg-green-50 text-green-700 border-green-200"}`}
                       >
                         {c.payment_status}
                       </span>
@@ -389,6 +389,7 @@ export default function ManajemenCustomer() {
                     <option value="High">High</option>
                     <option value="Medium">Medium</option>
                     <option value="Low">Low</option>
+                    <option value="Not Defined">Not Defined</option>
                   </select>
                 </div>
                 <div>
@@ -404,6 +405,7 @@ export default function ManajemenCustomer() {
                     <option value="Good">Good</option>
                     <option value="Delayed">Delayed</option>
                     <option value="Bad Debt">Bad Debt</option>
+                    <option value="Not Defined">Not Defined</option>
                   </select>
                 </div>
                 <div className="md:col-span-2 flex justify-end gap-3 pt-5 mt-2 border-t border-slate-200">
